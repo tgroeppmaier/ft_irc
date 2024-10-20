@@ -1,0 +1,4 @@
+*.o
+client
+ircserv
+test/
