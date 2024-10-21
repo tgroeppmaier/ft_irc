@@ -21,12 +21,12 @@ private:
   pthread_mutex_t clients_mutex_; 
 
   int ep_fd_;
-  struct epoll_event ev_;
+  // struct epoll_event ev_;
 
 
   void initializeServerAddr();
-  static void* accept_clients_wrapper(void* arg);
-  void* accept_clients();
+  // static void* accept_clients_wrapper(void* arg);
+  // void* accept_clients();
 
 public:
   std::map<int, Client*> clients_; 
