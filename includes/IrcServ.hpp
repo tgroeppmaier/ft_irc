@@ -18,13 +18,18 @@ private:
   int server_fd_;
   std::string password_;
   sockaddr_in server_addr_;
-  pthread_mutex_t clients_mutex_; 
+  // pthread_mutex_t clients_mutex_; 
+  static IrcServ* instance_;
 
   int ep_fd_;
   // struct epoll_event ev_;
 
 
   void initializeServerAddr();
+  static void signal_handler(int signal);
+  static void set_non_block(int sock_fd);
+  void register_signal_handlers();
+
   // static void* accept_clients_wrapper(void* arg);
   // void* accept_clients();
 
@@ -38,6 +43,7 @@ public:
   // ~IrcServ();
 
   void start();
+  void cleanup();
 
   // int SetPort(int port);
 };

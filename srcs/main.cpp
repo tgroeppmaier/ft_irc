@@ -1,28 +1,31 @@
+#include <iostream>
 #include <string>
-#include <sys/types.h>
-
-#include <sys/socket.h> // For socket functions
-#include <netinet/in.h> // For sockaddr_in
-#include <cstdlib> // For exit() and EXIT_FAILURE
-#include <iostream> // For cout
-
-#include <fcntl.h>         // For non-blocking mode
-#include <unistd.h>        // For close()
-#include <cstring>         // For memset()
-#include <arpa/inet.h>     // For htons()
-#include <cerrno>
-#include <csignal>
-
+#include <sstream>
 #include "IrcServ.hpp"
 
-// create socket
-// bind socket
-// listen
-// accept connection
-// read
+using namespace std;
 
-int main (int argc, char *argv[]) {
-  IrcServ server1(6697);
-  server1.start();
-  return(0);
+int main(int argc, char* argv[]) {
+    if (argc < 2 || argc > 3) {
+        cerr << "Usage: " << argv[0] << " <port> <password>" << endl;
+        return 1;
+    }
+
+    // Extract and validate the port number
+    string port_str = argv[1];
+    int port;
+    stringstream ss(port_str);
+    if (!(ss >> port) || !ss.eof()) {
+        cerr << "Invalid port number: " << port_str << endl;
+        return 1;
+    }
+
+    // Extract the password
+    // string password = argv[2];
+
+    // Create and start the IRC server
+    IrcServ server(port);
+    server.start();
+
+    return 0;
 }
