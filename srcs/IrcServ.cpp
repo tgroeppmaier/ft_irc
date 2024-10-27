@@ -170,20 +170,31 @@ void IrcServ::event_loop() {
         clients_[client_fd] = new Client(client_fd, client_addr, addr_len);
       } else {
         client_fd = events[i].data.fd;
-        int bytes_read = 1;
         Client* client = clients_[client_fd];
-        while (bytes_read > 0) {
-          char buffer[513];
-          bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-          if (bytes_read > 0) {
-            buffer[bytes_read] = '\0';
-            client->add_buffer_to(buffer);
-            vector<string> messages = client->split_messages();
-            for (vector<string>::iterator it = messages.begin(); it != messages.end(); ++it) {
-                cout << *it << endl;
-            }
-          } else if (bytes_read == 0) {
-            cout << "Client disconnected" << endl;
+        int bytes_read;
+        char buffer[513];
+        while ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
+          buffer[bytes_read] = '\0';
+          client->add_buffer_to(buffer);
+          vector<string> messages = client->split_messages();
+          for (vector<string>::iterator it = messages.begin(); it != messages.end(); ++it) {
+            cout << *it << endl;
+          }
+        }
+        if (bytes_read == 0) {
+          cout << "Client disconnected" << endl;
+          if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
+            perror("Error removing client socket from epoll");
+          }
+          if (close(client_fd) == -1) {
+            perror("Error closing client socket");
+          }
+          delete client;
+          clients_.erase(client_fd);
+        } else {
+          if (errno != EWOULDBLOCK && errno != EAGAIN) {
+            // An actual error occurred
+            perror("Error. Failed to read from client");
             if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
               perror("Error removing client socket from epoll");
             }
@@ -192,21 +203,6 @@ void IrcServ::event_loop() {
             }
             delete client;
             clients_.erase(client_fd);
-            break; // Exit the loop after closing the connection
-          } else {
-            if (errno != EWOULDBLOCK && errno != EAGAIN) {
-              // An actual error occurred
-              perror("Error. Failed to read from client");
-              if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
-                perror("Error removing client socket from epoll");
-              }
-              if (close(client_fd) == -1) {
-                perror("Error closing client socket");
-              }
-              delete client;
-              clients_.erase(client_fd);
-              break; // Exit the loop after handling the error
-            }
           }
         }
       }
