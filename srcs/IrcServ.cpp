@@ -171,14 +171,17 @@ void IrcServ::event_loop() {
       } else {
         client_fd = events[i].data.fd;
         int bytes_read = 1;
+        Client* client = clients_[client_fd];
         while (bytes_read > 0) {
-          char buffer[512];
+          char buffer[513];
           bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
           if (bytes_read > 0) {
             buffer[bytes_read] = '\0';
-            clients_[client_fd]->add_buffer_to(buffer);
-            // clients_[client_fd]->buffer_msg_from_ += buffer;
-            cout << clients_[client_fd]->buffer_msg_from_ << endl;
+            client->add_buffer_to(buffer);
+            vector<string> messages = client->split_messages();
+            for (vector<string>::iterator it = messages.begin(); it != messages.end(); ++it) {
+                cout << *it << endl;
+            }
           } else if (bytes_read == 0) {
             cout << "Client disconnected" << endl;
             if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
@@ -187,7 +190,7 @@ void IrcServ::event_loop() {
             if (close(client_fd) == -1) {
               perror("Error closing client socket");
             }
-            delete clients_[client_fd];
+            delete client;
             clients_.erase(client_fd);
             break; // Exit the loop after closing the connection
           } else {
@@ -200,7 +203,7 @@ void IrcServ::event_loop() {
               if (close(client_fd) == -1) {
                 perror("Error closing client socket");
               }
-              delete clients_[client_fd];
+              delete client;
               clients_.erase(client_fd);
               break; // Exit the loop after handling the error
             }

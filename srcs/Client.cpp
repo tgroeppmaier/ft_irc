@@ -4,7 +4,6 @@
 #include "Client.hpp"
 
 
-using namespace std;
 
 // void Client::initializeServerAddr() {
 //   memset(&server_addr_, 0, sizeof(server_addr_));
@@ -22,6 +21,24 @@ Client::~Client() {
   close(fd_);
 }
 
-void Client::add_buffer_to(char* message) {
-  buffer_msg_from_ += message;
+void Client::add_buffer_to(const char* message) {
+  if (message) {
+    buffer_msg_from_.append(message);
+  }
 }
+
+vector<string> Client::split_messages() {
+  size_t start = 0;
+  size_t end;
+  vector<string> messages;
+  while ((end = buffer_msg_from_.find("\r\n", start)) != string::npos) {
+    messages.push_back(buffer_msg_from_.substr(start, end - start));
+    start = end + 2;
+  }
+  if (start > buffer_msg_from_.size()) {
+    start -= 2;
+  }  
+  buffer_msg_from_.erase(0, start);;
+  return messages;
+}
+

@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+using namespace std;
+
+
 class Client {
 private:
 
@@ -19,8 +22,8 @@ public:
   Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len_);
   ~Client();
 
-  std::vector<std::string>& split_messages();
-  void add_buffer_to(char* message);
+  std::vector<std::string> split_messages();
+  void add_buffer_to(const char* message);
 
 };
 
