@@ -29,6 +29,8 @@ private:
   static void signal_handler(int signal);
   static void set_non_block(int sock_fd);
   void register_signal_handlers();
+  void event_loop();
+
 
   // static void* accept_clients_wrapper(void* arg);
   // void* accept_clients();

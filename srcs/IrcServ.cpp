@@ -132,8 +132,12 @@ void IrcServ::start() {
     exit(EXIT_FAILURE);
   }
   cout << "Server started on port " << port_ << endl;
+  event_loop();
+}
 
+void IrcServ::event_loop() {
   while (true) {
+    int client_fd = -1;
     epoll_event events[100];
     int n = epoll_wait(ep_fd_, events, 100, -1);
     if (n == -1) {
@@ -142,19 +146,17 @@ void IrcServ::start() {
     }
     for (int i = 0; i < n; ++i) {
       if (events[i].data.fd == server_fd_) {
-        cout << server_fd_ << endl;
         sockaddr_in client_addr;
         socklen_t addr_len = sizeof(client_addr);
-        int client_fd = accept(server_fd_, (sockaddr*)&client_addr, &addr_len);
+        client_fd = accept(server_fd_, (sockaddr*)&client_addr, &addr_len);
         if (client_fd == -1) {
           perror("Error accepting");
           if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // No incoming connections, continue the loop
             continue;
-          }
-          else 
+          } else {
             exit(EXIT_FAILURE);
-
+          }
         }
         set_non_block(client_fd);
         epoll_event client_ev;
@@ -166,46 +168,44 @@ void IrcServ::start() {
           continue;
         }
         clients_[client_fd] = new Client(client_fd, client_addr, addr_len);
-      }
-      else {
-          char buffer[100];
-          int bytes_read = recv(events[i].data.fd, buffer, sizeof(buffer) - 1, 0);
+      } else {
+        client_fd = events[i].data.fd;
+        int bytes_read = 1;
+        while (bytes_read > 0) {
+          char buffer[512];
+          bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
           if (bytes_read > 0) {
-              buffer[bytes_read] = '\0';
-              cout << buffer << endl;
-          } 
-          else if (bytes_read == 0) {
-              // Connection closed by the client
-              cout << "Client disconnected" << endl;
-              // Remove the file descriptor from the epoll instance
-              if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, events[i].data.fd, NULL) == -1) {
-                  perror("Error removing client socket from epoll");
+            buffer[bytes_read] = '\0';
+            clients_[client_fd]->add_buffer_to(buffer);
+            // clients_[client_fd]->buffer_msg_from_ += buffer;
+            cout << clients_[client_fd]->buffer_msg_from_ << endl;
+          } else if (bytes_read == 0) {
+            cout << "Client disconnected" << endl;
+            if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
+              perror("Error removing client socket from epoll");
+            }
+            if (close(client_fd) == -1) {
+              perror("Error closing client socket");
+            }
+            delete clients_[client_fd];
+            clients_.erase(client_fd);
+            break; // Exit the loop after closing the connection
+          } else {
+            if (errno != EWOULDBLOCK && errno != EAGAIN) {
+              // An actual error occurred
+              perror("Error. Failed to read from client");
+              if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
+                perror("Error removing client socket from epoll");
               }
-              if (close(events[i].data.fd) == -1) {
+              if (close(client_fd) == -1) {
                 perror("Error closing client socket");
               }
-      
-              // delete clients_[events[i].data.fd];
-              // clients_.erase(events[i].data.fd);
-      
-          } 
-          else {
-              if (errno != EWOULDBLOCK && errno != EAGAIN) {
-                  // An actual error occurred
-                  perror("Error. Failed to read from client");
-                  // Remove the file descriptor from the epoll instance
-                  if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, events[i].data.fd, NULL) == -1) {
-                      perror("Error removing client socket from epoll");
-                  }
-                  if (close(events[i].data.fd) == -1) {
-                    perror("Error closing client socket");
-                  }
-      
-                  // delete clients_[events[i].data.fd];
-                  // clients_.erase(events[i].data.fd);
-      
-              }
+              delete clients_[client_fd];
+              clients_.erase(client_fd);
+              break; // Exit the loop after handling the error
+            }
           }
+        }
       }
     }
   }
