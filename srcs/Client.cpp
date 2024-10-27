@@ -27,18 +27,17 @@ void Client::add_buffer_to(const char* message) {
   }
 }
 
-vector<string> Client::split_messages() {
+void Client::split_buffer() {
   size_t start = 0;
   size_t end;
-  vector<string> messages;
+  // vector<string> messages;
   while ((end = buffer_msg_from_.find("\r\n", start)) != string::npos) {
-    messages.push_back(buffer_msg_from_.substr(start, end - start));
+    messages_.push_back(buffer_msg_from_.substr(start, end - start));
     start = end + 2;
   }
   if (start > buffer_msg_from_.size()) {
     start -= 2;
   }  
   buffer_msg_from_.erase(0, start);;
-  return messages;
 }
 

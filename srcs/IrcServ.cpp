@@ -10,6 +10,7 @@
 #include <signal.h>
 
 #include "IrcServ.hpp"
+#include "MessageHandler.hpp"
 
 
 using namespace std;
@@ -44,7 +45,7 @@ void IrcServ::cleanup() {
         close(ep_fd_);
         ep_fd_ = -1;
     }
-    cout << "KILLED BY SIGNAL##################################################" << endl;
+    cout << "######################KILLED BY SIGNAL#############################" << endl;
 
     // pthread_mutex_destroy(&clients_mutex_);
 
@@ -145,12 +146,12 @@ void IrcServ::event_loop() {
       exit(EXIT_FAILURE);
     }
     for (int i = 0; i < n; ++i) {
-      if (events[i].data.fd == server_fd_) {
+      if (events[i].data.fd == server_fd_) { // event on server fd
         sockaddr_in client_addr;
         socklen_t addr_len = sizeof(client_addr);
         client_fd = accept(server_fd_, (sockaddr*)&client_addr, &addr_len);
         if (client_fd == -1) {
-          perror("Error accepting");
+          perror("Error accepting connection");
           if (errno == EAGAIN || errno == EWOULDBLOCK) {
             // No incoming connections, continue the loop
             continue;
@@ -168,7 +169,8 @@ void IrcServ::event_loop() {
           continue;
         }
         clients_[client_fd] = new Client(client_fd, client_addr, addr_len);
-      } else {
+      } 
+      else { // event on client fd
         client_fd = events[i].data.fd;
         Client* client = clients_[client_fd];
         int bytes_read;
@@ -176,12 +178,13 @@ void IrcServ::event_loop() {
         while ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
-          vector<string> messages = client->split_messages();
-          for (vector<string>::iterator it = messages.begin(); it != messages.end(); ++it) {
-            cout << *it << endl;
-          }
+          MessageHandler::process_messages(*client);
+          // client->split_buffer();
         }
-        if (bytes_read == 0) {
+        for (vector<string>::iterator it = client->messages_.begin(); it != client->messages_.end(); ++it) {
+          cout << *it << endl;
+        }
+        if (bytes_read == 0) { // 0 means client disconnected
           cout << "Client disconnected" << endl;
           if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
             perror("Error removing client socket from epoll");
@@ -191,8 +194,9 @@ void IrcServ::event_loop() {
           }
           delete client;
           clients_.erase(client_fd);
-        } else {
-          if (errno != EWOULDBLOCK && errno != EAGAIN) {
+        } 
+        else { // -1 everything else. nothing more to read or errors
+          if (errno != EWOULDBLOCK && errno != EAGAIN) { // checks if there wasnt just more to read
             // An actual error occurred
             perror("Error. Failed to read from client");
             if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {

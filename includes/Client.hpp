@@ -18,11 +18,12 @@ public:
   std::string nick_;
   std::string buffer_msg_to_;
   std::string buffer_msg_from_;
+  vector<string> messages_;
 
   Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len_);
   ~Client();
 
-  std::vector<std::string> split_messages();
+  void split_buffer();
   void add_buffer_to(const char* message);
 
 };
