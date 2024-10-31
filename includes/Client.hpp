@@ -16,6 +16,11 @@ public:
   sockaddr_in client_addr_;
   socklen_t client_addr_len_;
   std::string nick_;
+
+  std::string username_;
+  std::string hostname_;
+  std::string servername_;
+  std::string realname_;
   std::string buffer_msg_to_;
   std::string buffer_msg_from_;
   vector<string> messages_;

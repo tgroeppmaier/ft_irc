@@ -4,10 +4,22 @@
 #include <string>
 #include <vector>
 #include "Client.hpp"
+#include "IrcServ.hpp"
 
-namespace MessageHandler {
-    // Process messages (to be implemented as needed)
-    void process_messages(Client& client);
-}
+class IrcServ;
 
-#endif // MESSAGEHANDLER_HPP
+class MessageHandler {
+public:
+  MessageHandler(IrcServ& server);
+
+  void process_incoming_messages(Client& client);
+
+private:
+  IrcServ& server_;
+  void split_buffer(Client& client);
+
+  // Get command from a message
+  // void get_command(string& message);
+};
+
+#endif 

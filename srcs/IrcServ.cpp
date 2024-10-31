@@ -10,77 +10,149 @@
 #include <signal.h>
 
 #include "IrcServ.hpp"
-#include "MessageHandler.hpp"
 
 
 using namespace std;
 
-IrcServ* IrcServ::instance_ = NULL; // Initialize the static member variable
+IrcServ* IrcServ::instance_ = NULL;
 
 IrcServ::IrcServ(int port) : port_(port) {
-    initializeServerAddr();
-    instance_ = this; // Set the static member variable to this instance
+  initializeServerAddr();
+  instance_ = this;
+    command_map_["CAP"] = &IrcServ::command_CAP;
+    command_map_["NICK"] = &IrcServ::command_NICK;
+    command_map_["USER"] = &IrcServ::command_USER;
 }
 
 IrcServ::IrcServ(int port, string password) : port_(port), password_(password) {
-    initializeServerAddr();
-    instance_ = this; // Set the static member variable to this instance
+  initializeServerAddr();
+  instance_ = this;
+    command_map_["CAP"] = &IrcServ::command_CAP;
+    command_map_["NICK"] = &IrcServ::command_NICK;
+    command_map_["USER"] = &IrcServ::command_USER;
 }
 
 
 void IrcServ::signal_handler(int signal) {
-    cout << "Signal " << signal << " received, cleaning up and exiting..." << endl;
-    if (instance_) {
-        instance_->cleanup();
-    }
-    exit(0);
+  cout << "Signal " << signal << " received, cleaning up and exiting..." << endl;
+  if (instance_) {
+      instance_->cleanup();
+  }
+  exit(0);
 }
 
 void IrcServ::cleanup() {
-    if (server_fd_ != -1) {
-        close(server_fd_);
-        server_fd_ = -1;
-    }
-    if (ep_fd_ != -1) {
-        close(ep_fd_);
-        ep_fd_ = -1;
-    }
-    cout << "######################KILLED BY SIGNAL#############################" << endl;
+  if (server_fd_ != -1) {
+      close(server_fd_);
+      server_fd_ = -1;
+  }
+  if (ep_fd_ != -1) {
+      close(ep_fd_);
+      ep_fd_ = -1;
+  }
+  cout << "######################KILLED BY SIGNAL#############################" << endl;
 
-    // pthread_mutex_destroy(&clients_mutex_);
-
-    // Close and delete all client connections
-    for (std::map<int, Client*>::iterator it = clients_.begin(); it != clients_.end(); ++it) {
-        if (it->first != -1) {
-            close(it->first);
-        }
-        delete it->second;
+  // Close and delete all client connections
+  for (std::map<int, Client*>::iterator it = clients_.begin(); it != clients_.end(); ++it) {
+    if (it->first != -1) {
+        close(it->first);
     }
-    clients_.clear();
+    delete it->second;
+  }
+  clients_.clear();
+  command_map_.clear();
 }
-
-
 
 void IrcServ::register_signal_handlers() {
-    struct sigaction sa;
-    sa.sa_handler = IrcServ::signal_handler;
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = 0;
+  struct sigaction sa;
+  sa.sa_handler = IrcServ::signal_handler;
+  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = 0;
 
-    if (sigaction(SIGINT, &sa, NULL) == -1) {
-        perror("Error registering SIGINT handler");
-        exit(EXIT_FAILURE);
-    }
+  if (sigaction(SIGINT, &sa, NULL) == -1) {
+      perror("Error registering SIGINT handler");
+      exit(EXIT_FAILURE);
+  }
 
-    if (sigaction(SIGTERM, &sa, NULL) == -1) {
-        perror("Error registering SIGTERM handler");
-        exit(EXIT_FAILURE);
-    }
+  if (sigaction(SIGTERM, &sa, NULL) == -1) {
+      perror("Error registering SIGTERM handler");
+      exit(EXIT_FAILURE);
+  }
 }
+
+void IrcServ::close_client_fd(int client_fd) {
+  if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
+      perror("Error removing client socket from epoll");
+  }
+  if (close(client_fd) == -1) {
+      perror("Error closing client socket");
+  }
+  delete clients_[client_fd];
+  clients_.erase(client_fd);
+}
+
+void print_args(Client& client, vector<string>& arguments) {
+  for(vector<string>::iterator it = arguments.begin(); it != arguments.end(); ++it) {
+    cout << *it << ' ';
+  }
+  cout << endl;
+}
+
+void IrcServ::command_CAP(Client& client, vector<string>& arguments) {
+  std::cout << "Handling CAP command for client " << client.fd_ << std::endl;
+  print_args(client, arguments);
+}
+
+  void IrcServ::command_NICK(Client& client, vector<string>& arguments) {
+  if (!arguments[0].empty()) {
+    client.nick_ = arguments[0];
+  }
+  print_args(client, arguments);
+  std::cout << "Handling NICK command for client " << client.fd_ << std::endl;
+}
+
+void IrcServ::send_message(Client& client, const char* message, size_t length) {
+  // size_t length = message.size();
+  size_t bytes_sent = send(client.fd_, message, length, 0);
+  if ((bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
+    UnsentMessage full_message = {client.fd_, length, message};
+    unsent_messages_.push_back(full_message);
+  }
+}
+
+void IrcServ::command_USER(Client& client, vector<string>& arguments) {
+    std::cout << "Handling USER command for client " << client.fd_ << std::endl;
+    print_args(client, arguments);
+
+    if (arguments.size() < 4) {
+        std::string response = "461 " + client.nick_ + " USER :Not enough parameters\r\n";
+        send_message(client, response.c_str(), response.length());
+        // send(client.fd_, response.c_str(), response.length(), 0);
+        return;
+    }
+
+    client.username_ = arguments[0];
+    client.hostname_ = arguments[1];
+    client.servername_ = arguments[2];
+    client.realname_ = arguments[3];
+
+    string response = "001 " + client.nick_ + " :Welcome to the IRC server\r\n";
+    send(client.fd_, response.c_str(), response.length(), 0);
+
+    response = "002 " + client.nick_ + " :Your host is " + "server_addr_.sin_addr.s_addr "+ ", running version 1.0\r\n";
+    send(client.fd_, response.c_str(), response.length(), 0);
+
+    response = "003 " + client.nick_ + " :This server was created today\r\n";
+    send(client.fd_, response.c_str(), response.length(), 0);
+
+    response = "004 " + client.nick_ + " " + "server_addr_.sin_addr.s_addr" + " 1.0 o o\r\n";
+    send(client.fd_, response.c_str(), response.length(), 0);
+}
+
 
 
 void IrcServ::set_non_block(int sock_fd) {
-    int flags = fcntl(sock_fd, F_GETFL, 0);
+  int flags = fcntl(sock_fd, F_GETFL, 0);
   if (flags == -1) {
     cerr << "Error. Failed to get socket flags: " << strerror(errno) << endl;
     exit(EXIT_FAILURE);
@@ -137,6 +209,7 @@ void IrcServ::start() {
 }
 
 void IrcServ::event_loop() {
+  MessageHandler message_handler(*this);
   while (true) {
     int client_fd = -1;
     epoll_event events[100];
@@ -175,39 +248,25 @@ void IrcServ::event_loop() {
         Client* client = clients_[client_fd];
         int bytes_read;
         char buffer[513];
+        bool new_data_added = false; 
         while ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
-          MessageHandler::process_messages(*client);
-          // client->split_buffer();
+          new_data_added = true; 
         }
-        for (vector<string>::iterator it = client->messages_.begin(); it != client->messages_.end(); ++it) {
-          cout << *it << endl;
+        if (new_data_added) {
+          message_handler.process_incoming_messages(*client);
+          // for (vector<string>::iterator it = client->messages_.begin(); it != client->messages_.end(); ++it) {
+          //   cout << *it << endl;
+          // }
         }
-        if (bytes_read == 0) { // 0 means client disconnected
-          cout << "Client disconnected" << endl;
-          if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
-            perror("Error removing client socket from epoll");
+        if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {
+          if (bytes_read == 0) {
+              cout << "Client disconnected" << endl;
+          } else {
+              perror("Error. Failed to read from client");
           }
-          if (close(client_fd) == -1) {
-            perror("Error closing client socket");
-          }
-          delete client;
-          clients_.erase(client_fd);
-        } 
-        else { // -1 everything else. nothing more to read or errors
-          if (errno != EWOULDBLOCK && errno != EAGAIN) { // checks if there wasnt just more to read
-            // An actual error occurred
-            perror("Error. Failed to read from client");
-            if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
-              perror("Error removing client socket from epoll");
-            }
-            if (close(client_fd) == -1) {
-              perror("Error closing client socket");
-            }
-            delete client;
-            clients_.erase(client_fd);
-          }
+          close_client_fd(client_fd);
         }
       }
     }

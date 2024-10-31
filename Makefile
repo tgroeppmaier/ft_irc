@@ -1,4 +1,5 @@
-CC = c++
+# CC = clang++
+CC = g++
 # CFLAGS = -Wall -Weffc++ -Wextra -Wconversion -Wsign-conversion -Werror -Wshadow -g -std=c++98 -Iincludes
 CFLAGS = -Wall -Wextra -Wsign-conversion -Wshadow -g -std=c++98 -Iincludes
 NAME = ircserv
