@@ -11,7 +11,6 @@
 
 #include "IrcServ.hpp"
 
-
 using namespace std;
 
 IrcServ* IrcServ::instance_ = NULL;
@@ -19,17 +18,14 @@ IrcServ* IrcServ::instance_ = NULL;
 IrcServ::IrcServ(int port) : port_(port) {
   initializeServerAddr();
   instance_ = this;
-    command_map_["CAP"] = &IrcServ::command_CAP;
-    command_map_["NICK"] = &IrcServ::command_NICK;
-    command_map_["USER"] = &IrcServ::command_USER;
+}
+
+IrcServ::~IrcServ() {
 }
 
 IrcServ::IrcServ(int port, string password) : port_(port), password_(password) {
   initializeServerAddr();
   instance_ = this;
-    command_map_["CAP"] = &IrcServ::command_CAP;
-    command_map_["NICK"] = &IrcServ::command_NICK;
-    command_map_["USER"] = &IrcServ::command_USER;
 }
 
 
@@ -60,7 +56,7 @@ void IrcServ::cleanup() {
     delete it->second;
   }
   clients_.clear();
-  command_map_.clear();
+  delete message_handler_;
 }
 
 void IrcServ::register_signal_handlers() {
@@ -90,65 +86,6 @@ void IrcServ::close_client_fd(int client_fd) {
   delete clients_[client_fd];
   clients_.erase(client_fd);
 }
-
-void print_args(Client& client, vector<string>& arguments) {
-  for(vector<string>::iterator it = arguments.begin(); it != arguments.end(); ++it) {
-    cout << *it << ' ';
-  }
-  cout << endl;
-}
-
-void IrcServ::command_CAP(Client& client, vector<string>& arguments) {
-  std::cout << "Handling CAP command for client " << client.fd_ << std::endl;
-  print_args(client, arguments);
-}
-
-  void IrcServ::command_NICK(Client& client, vector<string>& arguments) {
-  if (!arguments[0].empty()) {
-    client.nick_ = arguments[0];
-  }
-  print_args(client, arguments);
-  std::cout << "Handling NICK command for client " << client.fd_ << std::endl;
-}
-
-void IrcServ::send_message(Client& client, const char* message, size_t length) {
-  // size_t length = message.size();
-  size_t bytes_sent = send(client.fd_, message, length, 0);
-  if ((bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
-    UnsentMessage full_message = {client.fd_, length, message};
-    unsent_messages_.push_back(full_message);
-  }
-}
-
-void IrcServ::command_USER(Client& client, vector<string>& arguments) {
-    std::cout << "Handling USER command for client " << client.fd_ << std::endl;
-    print_args(client, arguments);
-
-    if (arguments.size() < 4) {
-        std::string response = "461 " + client.nick_ + " USER :Not enough parameters\r\n";
-        send_message(client, response.c_str(), response.length());
-        // send(client.fd_, response.c_str(), response.length(), 0);
-        return;
-    }
-
-    client.username_ = arguments[0];
-    client.hostname_ = arguments[1];
-    client.servername_ = arguments[2];
-    client.realname_ = arguments[3];
-
-    string response = "001 " + client.nick_ + " :Welcome to the IRC server\r\n";
-    send(client.fd_, response.c_str(), response.length(), 0);
-
-    response = "002 " + client.nick_ + " :Your host is " + "server_addr_.sin_addr.s_addr "+ ", running version 1.0\r\n";
-    send(client.fd_, response.c_str(), response.length(), 0);
-
-    response = "003 " + client.nick_ + " :This server was created today\r\n";
-    send(client.fd_, response.c_str(), response.length(), 0);
-
-    response = "004 " + client.nick_ + " " + "server_addr_.sin_addr.s_addr" + " 1.0 o o\r\n";
-    send(client.fd_, response.c_str(), response.length(), 0);
-}
-
 
 
 void IrcServ::set_non_block(int sock_fd) {
@@ -209,7 +146,7 @@ void IrcServ::start() {
 }
 
 void IrcServ::event_loop() {
-  MessageHandler message_handler(*this);
+  // message_handler_ = &MessageHandler(*this);
   while (true) {
     int client_fd = -1;
     epoll_event events[100];
@@ -255,7 +192,7 @@ void IrcServ::event_loop() {
           new_data_added = true; 
         }
         if (new_data_added) {
-          message_handler.process_incoming_messages(*client);
+          message_handler_->process_incoming_messages(*client);
           // for (vector<string>::iterator it = client->messages_.begin(); it != client->messages_.end(); ++it) {
           //   cout << *it << endl;
           // }

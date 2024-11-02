@@ -3,23 +3,42 @@
 
 #include <string>
 #include <vector>
+#include <map>
 #include "Client.hpp"
 #include "IrcServ.hpp"
 
 class IrcServ;
 
+
+struct UnsentMessage {
+  int fd;
+  size_t length;
+  const char* message;
+};
+
+
 class MessageHandler {
+private:
+  IrcServ& server_;
+  deque<UnsentMessage> unsent_messages_;
+
+  void split_buffer(Client& client);
+  void send_message(Client& client, const char* message, size_t length);
+
 public:
   MessageHandler(IrcServ& server);
+  ~MessageHandler();
 
   void process_incoming_messages(Client& client);
 
-private:
-  IrcServ& server_;
-  void split_buffer(Client& client);
+  // Command handling functions
+  void command_CAP(Client& client, std::vector<std::string>& arguments);
+  void command_NICK(Client& client, std::vector<std::string>& arguments);
+  void command_USER(Client& client, std::vector<std::string>& arguments);
+// Map of command strings to function pointers
+  std::map<std::string, void(MessageHandler::*)(Client&, std::vector<std::string>&)> command_map_;
 
-  // Get command from a message
-  // void get_command(string& message);
+
 };
 
-#endif 
+#endif
