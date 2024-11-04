@@ -23,7 +23,7 @@ private:
   std::deque<UnsentMessage> unsent_messages_;
 
   // void split_buffer(Client& client);
-  void send_message(Client& client, string& message);
+  void send_message(Client& client, std::string& message);
 
 public:
   MessageHandler(IrcServ& server);
@@ -36,6 +36,8 @@ public:
   void command_NICK(Client& client, std::vector<std::string>& arguments);
   void command_USER(Client& client, std::vector<std::string>& arguments);
   void command_PING(Client& client, std::vector<std::string>& arguments);
+  void reply_ERR_NEEDMOREPARAMS(Client& client, std::vector<std::string>& arguments);
+
   // Map of command strings to function pointers
   std::map<std::string, void(MessageHandler::*)(Client&, std::vector<std::string>&)> command_map_;
 

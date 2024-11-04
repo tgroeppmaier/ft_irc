@@ -3,6 +3,9 @@
 #include <cstring>
 #include "Client.hpp"
 
+using std::string;
+using std::vector;
+
 Client::Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len)
   : fd_(fd),
     client_addr_(client_addr),

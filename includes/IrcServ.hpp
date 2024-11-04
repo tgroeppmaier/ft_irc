@@ -12,8 +12,10 @@
 #include <cstdlib>
 #include "MessageHandler.hpp"
 #include "Client.hpp"
+#include "Channel.hpp"
 
 class MessageHandler;
+class Channel;
 
 class IrcServ {
 private:
@@ -35,7 +37,8 @@ private:
 
 public:
   sockaddr_in server_addr_;
-  std::map<int, Client*> clients_; 
+  std::map<int, Client*> clients_;
+  std::map<std::string, Channel*> channels_;
   MessageHandler* message_handler_;
 
   IrcServ(int port);

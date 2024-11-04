@@ -4,7 +4,6 @@
 #include <arpa/inet.h> // For inet_ntoa
 
 
-
 using std::vector;
 using std::string;
 using std::deque;
@@ -55,20 +54,24 @@ void MessageHandler::process_incoming_messages(Client& client) {
     }
     std::map<std::string, void(MessageHandler::*)(Client&, std::vector<std::string>&)>::iterator cmd_it = command_map_.find(command);
     if (cmd_it != command_map_.end()) {
-        (this->*(cmd_it->second))(client, arguments);void MessageHandler::command_PING(Client& client, std::vector<std::string>& arguments) {
-  string message = 
-  send_message();
-}
+        (this->*(cmd_it->second))(client, arguments);
     } else {
-      string message  = "421 " + client.nick_ + " " + command + " :Unknown command";
+      string message  = "421 " + client.nick_ + " " + command + " :Unknown command\r\n";
       send_message(client, message);
-      std::cout << "***Unknown command:*** " << command << std::endl;
+      std::cout << "###Unknown command: " << command << std::endl;
     }
   }
   client.messages_.clear();
 }
 
 
+
+void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, std::vector<std::string>& arguments) {
+    if (!arguments[0].empty()) {
+      string message  = "461 " + client.nick_ + " " + arguments[0] + " :Not enough parameters\r\n";
+      send_message(client, message);
+    }
+}
 
 void MessageHandler::command_CAP(Client& client, std::vector<std::string>& arguments) {
   // std::cout << "Handling CAP command for client " << client.fd_ << std::endl;
@@ -78,20 +81,30 @@ void MessageHandler::command_NICK(Client& client, std::vector<std::string>& argu
   if (!arguments[0].empty()) {
     client.nick_ = arguments[0];
   }
+  else {
+    reply_ERR_NEEDMOREPARAMS(client, arguments);
+  }
   // std::cout << "Handling NICK command for client " << client.nick_<< std::endl;
 }
 
 void MessageHandler::command_PING(Client& client, std::vector<std::string>& arguments) {
-  string message = "PONG \r\n";
-  send_message(client, message);
+  if (!arguments[0].empty()) {
+    string message = "PONG \r\n";
+    send_message(client, message);
+  }
+  else {
+    reply_ERR_NEEDMOREPARAMS(client, arguments);
+  }
 }
+
+
+
 
 void MessageHandler::command_USER(Client& client, std::vector<std::string>& arguments) {
   // print_args(client, arguments);
 
   if (arguments.size() < 4) {
-    std::string response = "461 " + client.nick_ + " USER :Not enough parameters\r\n";
-    send_message(client, response);
+    reply_ERR_NEEDMOREPARAMS(client, arguments);
     return;
   }
 

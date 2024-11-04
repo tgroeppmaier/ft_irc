@@ -5,10 +5,6 @@
 #include <string>
 #include <vector>
 
-using std::string;
-using std::vector;
-
-
 class Client {
 private:
 
@@ -24,7 +20,7 @@ public:
   std::string realname_;
   std::string buffer_msg_to_;
   std::string buffer_msg_from_;
-  vector<string> messages_;
+  std::vector<std::string> messages_;
 
   Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len_);
   ~Client();
