@@ -21,7 +21,6 @@ private:
   int server_fd_;
   int ep_fd_;
   std::string password_;
-  sockaddr_in server_addr_;
   static IrcServ* instance_;
   
 
@@ -35,6 +34,7 @@ private:
 
 
 public:
+  sockaddr_in server_addr_;
   std::map<int, Client*> clients_; 
   MessageHandler* message_handler_;
 
