@@ -1,7 +1,7 @@
 # CC = clang++
 CC = g++
 # CFLAGS = -Wall -Wextra -Werror -Weffc++ -Wconversion -Wsign-conversion -Wshadow -g -std=c++98 -Iincludes
-CFLAGS = -Wall -Wextra -Wsign-conversion -Wshadow -g -std=c++98 -Iincludes
+CFLAGS = -Wall -Wextra -Wconversion -Wsign-conversion -Wshadow -g -std=c++98 -Iincludes
 NAME = ircserv
 SRC = $(wildcard srcs/*.cpp)
 OBJ = $(SRC:.cpp=.o)

@@ -7,6 +7,7 @@
 #include "Client.hpp"
 #include "IrcServ.hpp"
 
+
 class IrcServ;
 
 
@@ -16,13 +17,12 @@ struct UnsentMessage {
   const char* message;
 };
 
-
 class MessageHandler {
 private:
   IrcServ& server_;
-  deque<UnsentMessage> unsent_messages_;
+  std::deque<UnsentMessage> unsent_messages_;
 
-  void split_buffer(Client& client);
+  // void split_buffer(Client& client);
   void send_message(Client& client, const char* message, size_t length);
 
 public:
@@ -35,7 +35,7 @@ public:
   void command_CAP(Client& client, std::vector<std::string>& arguments);
   void command_NICK(Client& client, std::vector<std::string>& arguments);
   void command_USER(Client& client, std::vector<std::string>& arguments);
-// Map of command strings to function pointers
+  // Map of command strings to function pointers
   std::map<std::string, void(MessageHandler::*)(Client&, std::vector<std::string>&)> command_map_;
 
 

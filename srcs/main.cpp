@@ -25,8 +25,8 @@ int main(int argc, char* argv[]) {
   // string password = argv[2];
 
   IrcServ server(port);
-  MessageHandler* message_handler= new MessageHandler(server);
-  server.message_handler_ = message_handler;
+  // MessageHandler* message_handler= new MessageHandler(server);
+  // server.message_handler_ = message_handler;
   server.start();
 
   return 0;

@@ -11,23 +11,41 @@
 
 #include "IrcServ.hpp"
 
-using namespace std;
+// using namespaceusing std string;
+using std::string;
+using std::cout;
+using std::cerr;
+using std::endl;
+
 
 IrcServ* IrcServ::instance_ = NULL;
 
-IrcServ::IrcServ(int port) : port_(port) {
+IrcServ::IrcServ(int port) : 
+  port_(port),
+  server_fd_(0),
+  ep_fd_(0),
+  server_addr_(),
+  clients_(),
+  message_handler_(new MessageHandler(*this)) {
+  initializeServerAddr();
+  instance_ = this;
+}
+
+IrcServ::IrcServ(int port, string password) :
+ port_(port), 
+      server_fd_(0),
+      ep_fd_(0),
+ password_(password),
+      server_addr_(),
+      clients_(),
+      message_handler_(new MessageHandler(*this))
+ {
   initializeServerAddr();
   instance_ = this;
 }
 
 IrcServ::~IrcServ() {
 }
-
-IrcServ::IrcServ(int port, string password) : port_(port), password_(password) {
-  initializeServerAddr();
-  instance_ = this;
-}
-
 
 void IrcServ::signal_handler(int signal) {
   cout << "Signal " << signal << " received, cleaning up and exiting..." << endl;
@@ -37,22 +55,33 @@ void IrcServ::signal_handler(int signal) {
   exit(0);
 }
 
+void IrcServ::close_socket(int fd) {
+  if (fd != static_cast<uint16_t>(-1)) {
+    if (close(fd) == -1) {
+      std::cerr << "Error closing socket " << fd << ": " << std::strerror(errno) << std::endl;
+    } else {
+      std::cout << "Socket " << fd << " closed successfully." << std::endl;
+    }
+  }
+}
+
+void IrcServ::close_client_fd(int client_fd) {
+  if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
+      perror("Error removing client socket from epoll");
+  }
+  close_socket(client_fd);
+  delete clients_[client_fd];
+  clients_.erase(client_fd);
+}
+
 void IrcServ::cleanup() {
-  if (server_fd_ != -1) {
-      close(server_fd_);
-      server_fd_ = -1;
-  }
-  if (ep_fd_ != -1) {
-      close(ep_fd_);
-      ep_fd_ = -1;
-  }
   cout << "######################KILLED BY SIGNAL#############################" << endl;
+  close_socket(server_fd_);
+  close_socket(ep_fd_);
 
   // Close and delete all client connections
   for (std::map<int, Client*>::iterator it = clients_.begin(); it != clients_.end(); ++it) {
-    if (it->first != -1) {
-        close(it->first);
-    }
+    close_client_fd(it->first);
     delete it->second;
   }
   clients_.clear();
@@ -76,18 +105,6 @@ void IrcServ::register_signal_handlers() {
   }
 }
 
-void IrcServ::close_client_fd(int client_fd) {
-  if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
-      perror("Error removing client socket from epoll");
-  }
-  if (close(client_fd) == -1) {
-      perror("Error closing client socket");
-  }
-  delete clients_[client_fd];
-  clients_.erase(client_fd);
-}
-
-
 void IrcServ::set_non_block(int sock_fd) {
   int flags = fcntl(sock_fd, F_GETFL, 0);
   if (flags == -1) {
@@ -104,7 +121,7 @@ void IrcServ::initializeServerAddr() {
   memset(&server_addr_, 0, sizeof(server_addr_));
   server_addr_.sin_family = AF_INET;
   server_addr_.sin_addr.s_addr = inet_addr("127.0.0.1"); // INADDR_ANY; Listen on all interfaces
-  server_addr_.sin_port = htons(port_);
+  server_addr_.sin_port = htons(static_cast<uint16_t>(port_));
 }
 
 void IrcServ::start() {
@@ -146,7 +163,6 @@ void IrcServ::start() {
 }
 
 void IrcServ::event_loop() {
-  // message_handler_ = &MessageHandler(*this);
   while (true) {
     int client_fd = -1;
     epoll_event events[100];
@@ -183,12 +199,13 @@ void IrcServ::event_loop() {
       else { // event on client fd
         client_fd = events[i].data.fd;
         Client* client = clients_[client_fd];
-        int bytes_read;
+        ssize_t bytes_read;
         char buffer[513];
         bool new_data_added = false; 
         while ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
+          cout << buffer << endl; // for debug purposes
           new_data_added = true; 
         }
         if (new_data_added) {

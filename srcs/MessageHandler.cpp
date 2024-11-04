@@ -2,6 +2,12 @@
 #include <iostream>
 #include <sstream>
 
+
+using std::vector;
+using std::string;
+using std::deque;
+using std::map;
+
 MessageHandler::MessageHandler(IrcServ& server) : server_(server) {
   command_map_["CAP"] = &MessageHandler::command_CAP;
   command_map_["NICK"] = &MessageHandler::command_NICK;
@@ -19,24 +25,33 @@ MessageHandler::~MessageHandler() {
 //   cout << endl;
 // }
 
-void MessageHandler::split_buffer(Client& client) {
-  if (client.buffer_msg_from_.empty()) {
-    return;
+// void MessageHandler::split_buffer(Client& client) {
+//   if (client.buffer_msg_from_.empty()) {
+//     return;
+//   }
+//   size_t start = 0;
+//   size_t end;
+//   while ((end = client.buffer_msg_from_.find("\r\n", start)) != std::string::npos) {
+//     client.messages_.push_back(client.buffer_msg_from_.substr(start, end - start));
+//     start = end + 2;
+//   }
+//   if (start > client.buffer_msg_from_.size()) {
+//     start -= 2;
+//   }
+//   client.buffer_msg_from_.erase(0, start);
+// }
+
+void MessageHandler::send_message(Client& client, const char* message, size_t length) {
+  ssize_t bytes_sent = send(client.fd_, message, length, 0);
+  if ((bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
+    UnsentMessage full_message = {client.fd_, length, message};
+    unsent_messages_.push_back(full_message);
   }
-  size_t start = 0;
-  size_t end;
-  while ((end = client.buffer_msg_from_.find("\r\n", start)) != std::string::npos) {
-    client.messages_.push_back(client.buffer_msg_from_.substr(start, end - start));
-    start = end + 2;
-  }
-  if (start > client.buffer_msg_from_.size()) {
-    start -= 2;
-  }
-  client.buffer_msg_from_.erase(0, start);
+    // cout << "unsent: " << unsent_messages_.back().message << endl;
 }
 
 void MessageHandler::process_incoming_messages(Client& client) {
-  split_buffer(client);
+  client.split_buffer();
   for (std::vector<std::string>::iterator it = client.messages_.begin(); it != client.messages_.end(); ++it) {
     std::stringstream ss(*it);
     std::string command;
@@ -53,30 +68,25 @@ void MessageHandler::process_incoming_messages(Client& client) {
     if (cmd_it != command_map_.end()) {
         (this->*(cmd_it->second))(client, arguments);
     } else {
-        std::cout << "Unknown command: " << command << std::endl;
+      string message  = "421 " + client.nick_ + " " + command + " :Unknown command";
+      // send_message(client, message);
+        std::cout << "***Unknown command:*** " << command << std::endl;
     }
   }
   client.messages_.clear();
 }
 
-void MessageHandler::send_message(Client& client, const char* message, size_t length) {
-  ssize_t bytes_sent = send(client.fd_, message, length, 0);
-  if ((bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
-    UnsentMessage full_message = {client.fd_, length, message};
-    unsent_messages_.push_back(full_message);
-  }
-    // cout << "unsent: " << unsent_messages_.back().message << endl;
-}
+
 
 void MessageHandler::command_CAP(Client& client, std::vector<std::string>& arguments) {
-  std::cout << "Handling CAP command for client " << client.fd_ << std::endl;
+  // std::cout << "Handling CAP command for client " << client.fd_ << std::endl;
 }
 
 void MessageHandler::command_NICK(Client& client, std::vector<std::string>& arguments) {
   if (!arguments[0].empty()) {
     client.nick_ = arguments[0];
   }
-  std::cout << "Handling NICK command for client " << client.nick_<< std::endl;
+  // std::cout << "Handling NICK command for client " << client.nick_<< std::endl;
 }
 
 void MessageHandler::command_USER(Client& client, std::vector<std::string>& arguments) {

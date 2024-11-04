@@ -19,10 +19,10 @@ class IrcServ {
 private:
   int port_;
   int server_fd_;
+  int ep_fd_;
   std::string password_;
   sockaddr_in server_addr_;
   static IrcServ* instance_;
-  int ep_fd_;
   
 
   static void signal_handler(int signal);
@@ -41,6 +41,8 @@ public:
   IrcServ(int port);
   ~IrcServ();
   IrcServ(int port, std::string password);
+  void close_socket(int fd);
+
   // IrcServ(const IrcServ &other);
   // IrcServ &operator=(const IrcServ &other);
 
