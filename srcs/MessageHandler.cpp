@@ -14,6 +14,7 @@ MessageHandler::MessageHandler(IrcServ& server) : server_(server) {
   command_map_["NICK"] = &MessageHandler::command_NICK;
   command_map_["USER"] = &MessageHandler::command_USER;
   command_map_["PING"] = &MessageHandler::command_PING;
+  command_map_["QUIT"] = &MessageHandler::command_QUIT;
 }
 
 MessageHandler::~MessageHandler() {
@@ -67,10 +68,10 @@ void MessageHandler::process_incoming_messages(Client& client) {
 
 
 void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, std::vector<std::string>& arguments) {
-    if (!arguments[0].empty()) {
-      string message  = "461 " + client.nick_ + " " + arguments[0] + " :Not enough parameters\r\n";
-      send_message(client, message);
-    }
+  if (!arguments[0].empty()) {
+    string message  = "461 " + client.nick_ + " " + arguments[0] + " :Not enough parameters\r\n";
+    send_message(client, message);
+  }
 }
 
 void MessageHandler::command_CAP(Client& client, std::vector<std::string>& arguments) {
@@ -96,6 +97,11 @@ void MessageHandler::command_PING(Client& client, std::vector<std::string>& argu
     reply_ERR_NEEDMOREPARAMS(client, arguments);
   }
 }
+
+void MessageHandler::command_QUIT(Client& client, std::vector<std::string>& arguments) {
+  // server_.close_client_fd(client.fd_);
+}
+
 
 
 

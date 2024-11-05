@@ -28,7 +28,6 @@ private:
 
   static void signal_handler(int signal);
   static void set_non_block(int sock_fd);
-  void close_client_fd(int fd);
 
   void initializeServerAddr();
   void register_signal_handlers();
@@ -45,6 +44,7 @@ public:
   ~IrcServ();
   IrcServ(int port, std::string password);
   void close_socket(int fd);
+  void close_client_fd(int fd);
 
   // IrcServ(const IrcServ &other);
   // IrcServ &operator=(const IrcServ &other);

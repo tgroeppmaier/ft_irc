@@ -1,7 +1,5 @@
 #include "Channel.hpp"
 
-
-
 using std::string;
 using std::map;
 

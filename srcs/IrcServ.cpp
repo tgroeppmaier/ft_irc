@@ -201,20 +201,15 @@ void IrcServ::event_loop() {
         Client* client = clients_[client_fd];
         ssize_t bytes_read;
         char buffer[513];
-        bool new_data_added = false; 
-        while ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        // bool new_data_added = false; 
+        if ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
-          cout << buffer << endl; // for debug purposes
-          new_data_added = true; 
-        }
-        if (new_data_added) {
+          cout << buffer << endl; // debug purposes
           message_handler_->process_incoming_messages(*client);
-          // for (vector<string>::iterator it = client->messages_.begin(); it != client->messages_.end(); ++it) {
-          //   cout << *it << endl;
-          // }
-        }
-        if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {
+        } 
+        else if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {
+          // Handle client disconnection or error
           if (bytes_read == 0) {
               cout << "Client disconnected" << endl;
           } else {
@@ -226,3 +221,27 @@ void IrcServ::event_loop() {
     }
   }
 }
+//         while ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
+//           buffer[bytes_read] = '\0';
+//           client->add_buffer_to(buffer);
+//           cout << buffer << endl; // for debug purposes
+//           new_data_added = true; 
+//         }
+//         if (new_data_added) {
+//           message_handler_->process_incoming_messages(*client);
+//           // for (vector<string>::iterator it = client->messages_.begin(); it != client->messages_.end(); ++it) {
+//           //   cout << *it << endl;
+//           // }
+//         }
+//         if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {
+//           if (bytes_read == 0) {
+//               cout << "Client disconnected" << endl;
+//           } else {
+//               perror("Error. Failed to read from client");
+//           }
+//           close_client_fd(client_fd);
+//         }
+//       }
+//     }
+//   }
+// }

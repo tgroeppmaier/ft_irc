@@ -36,6 +36,7 @@ public:
   void command_NICK(Client& client, std::vector<std::string>& arguments);
   void command_USER(Client& client, std::vector<std::string>& arguments);
   void command_PING(Client& client, std::vector<std::string>& arguments);
+  void command_QUIT(Client& client, std::vector<std::string>& arguments);
   void reply_ERR_NEEDMOREPARAMS(Client& client, std::vector<std::string>& arguments);
 
   // Map of command strings to function pointers
