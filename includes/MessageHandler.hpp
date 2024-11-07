@@ -13,8 +13,8 @@ class IrcServ;
 
 struct UnsentMessage {
   int fd;
-  size_t length;
   const char* message;
+  size_t length;
 };
 
 class MessageHandler {

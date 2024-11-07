@@ -69,7 +69,6 @@ void IrcServ::close_client_fd(int client_fd) {
   if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
       perror("Error removing client socket from epoll");
   }
-  close_socket(client_fd);
   delete clients_[client_fd];
   clients_.erase(client_fd);
 }

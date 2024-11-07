@@ -33,7 +33,7 @@ void MessageHandler::send_message(Client& client, string& message) {
   size_t length = message.length();
   ssize_t bytes_sent = send(client.fd_, message.c_str(), length, 0);
   if ((bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
-    UnsentMessage full_message = {client.fd_, length, message.c_str()};
+    UnsentMessage full_message = {client.fd_, message.c_str(), length};
     unsent_messages_.push_back(full_message);
   }
     // cout << "unsent: " << unsent_messages_.back().message << endl;

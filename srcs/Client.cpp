@@ -21,7 +21,9 @@ Client::Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len)
 }
 
 Client::~Client() {
-  close(fd_);
+  if (fd_ > 0) {
+    close(fd_);
+  }
 }
 
 void Client::add_buffer_to(const char* message) {
