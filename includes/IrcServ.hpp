@@ -21,7 +21,6 @@ class IrcServ {
 private:
   int port_;
   int server_fd_;
-  int ep_fd_;
   std::string password_;
   static IrcServ* instance_;
   
@@ -35,6 +34,7 @@ private:
 
 
 public:
+  int ep_fd_;
   sockaddr_in server_addr_;
   std::map<int, Client*> clients_;
   std::map<std::string, Channel*> channels_;

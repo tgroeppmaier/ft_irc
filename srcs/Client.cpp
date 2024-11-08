@@ -17,7 +17,7 @@ Client::Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len)
     realname_(""),
     buffer_msg_to_(""),
     buffer_msg_from_(""),
-    messages_() {
+    received_messages_() {
 }
 
 Client::~Client() {
@@ -39,7 +39,7 @@ void Client::split_buffer() {
   size_t start = 0;
   size_t end;
   while ((end = buffer_msg_from_.find("\r\n", start)) != std::string::npos) {
-    messages_.push_back(buffer_msg_from_.substr(start, end - start));
+    received_messages_.push_back(buffer_msg_from_.substr(start, end - start));
     start = end + 2;
   }
   if (start > buffer_msg_from_.size()) {

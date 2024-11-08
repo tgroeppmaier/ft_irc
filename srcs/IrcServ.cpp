@@ -3,10 +3,9 @@
 #include <cstring>
 #include <stdio.h>
 #include <sys/epoll.h>
-#include <pthread.h>
 #include <fcntl.h>
 #include <cstdlib>
-#include <pthread.h>
+// #include <pthread.h>
 #include <signal.h>
 
 #include "IrcServ.hpp"
@@ -32,14 +31,13 @@ IrcServ::IrcServ(int port) :
 }
 
 IrcServ::IrcServ(int port, string password) :
- port_(port), 
-      server_fd_(0),
-      ep_fd_(0),
- password_(password),
-      server_addr_(),
-      clients_(),
-      message_handler_(new MessageHandler(*this))
- {
+  port_(port), 
+  server_fd_(0),
+  password_(password),
+  ep_fd_(0),
+  server_addr_(),
+  clients_(),
+  message_handler_(new MessageHandler(*this)) {
   initializeServerAddr();
   instance_ = this;
 }
@@ -194,8 +192,28 @@ void IrcServ::event_loop() {
           continue;
         }
         clients_[client_fd] = new Client(client_fd, client_addr, addr_len);
-      } 
-      else { // event on client fd
+      }
+      else if (events[i].events & EPOLLOUT) { // client fd is ready again
+        client_fd = events[i].data.fd;
+        Client* client = clients_[client_fd];
+        ssize_t bytes_sent;
+        while (!client->unsent_messages_.empty()) {
+          string message = client->unsent_messages_.front();
+          bytes_sent = send(client->fd_, message.c_str(), message.length(), 0);
+          if (bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+            continue;;
+          }
+          cout << "unsent message sent: " << message << endl;
+          client->unsent_messages_.pop_front();
+        }
+        epoll_event ev;
+        ev.events = EPOLLIN; // Listen for input events
+        ev.data.fd = client->fd_;
+        if (epoll_ctl(ep_fd_, EPOLL_CTL_MOD, client->fd_, &ev) == -1) {
+          perror("Error modifying client socket to EPOLLIN");
+        }
+      }
+      else { // event on client fd (incoming message)
         client_fd = events[i].data.fd;
         Client* client = clients_[client_fd];
         ssize_t bytes_read;

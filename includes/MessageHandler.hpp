@@ -20,7 +20,7 @@ struct UnsentMessage {
 class MessageHandler {
 private:
   IrcServ& server_;
-  std::deque<UnsentMessage> unsent_messages_;
+  // std::deque<UnsentMessage> unsent_messages_;
 
   // void split_buffer(Client& client);
   void send_message(Client& client, std::string& message);

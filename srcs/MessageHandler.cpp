@@ -1,6 +1,8 @@
 #include "MessageHandler.hpp"
 #include <iostream>
 #include <sstream>
+#include <cstdio>
+#include <sys/epoll.h>
 #include <arpa/inet.h> // For inet_ntoa
 
 
@@ -29,19 +31,28 @@ MessageHandler::~MessageHandler() {
 // }
 
 
-void MessageHandler::send_message(Client& client, string& message) {
+void MessageHandler::send_message(Client& client, std::string& message) {
   size_t length = message.length();
   ssize_t bytes_sent = send(client.fd_, message.c_str(), length, 0);
-  if ((bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK))) {
-    UnsentMessage full_message = {client.fd_, message.c_str(), length};
-    unsent_messages_.push_back(full_message);
+  if (bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
+    // Modify the existing event to include EPOLLOUT
+    epoll_event ev;
+    ev.events = EPOLLOUT; // Listen for output events to see when socket is available again
+    ev.data.fd = client.fd_;
+    if (epoll_ctl(server_.ep_fd_, EPOLL_CTL_MOD, client.fd_, &ev) == -1) {
+      perror("Error modifying client socket to include EPOLLOUT");
+      return;
+    }
+    client.unsent_messages_.push_back(message);
+  } 
+  else if (bytes_sent == -1) {
+    perror("Error sending message to client");
   }
-    // cout << "unsent: " << unsent_messages_.back().message << endl;
 }
 
 void MessageHandler::process_incoming_messages(Client& client) {
   client.split_buffer();
-  for (std::vector<std::string>::iterator it = client.messages_.begin(); it != client.messages_.end(); ++it) {
+  for (std::deque<std::string>::iterator it = client.received_messages_.begin(); it != client.received_messages_.end(); ++it) {
     std::stringstream ss(*it);
     std::string command;
     std::vector<std::string> arguments;
@@ -61,8 +72,8 @@ void MessageHandler::process_incoming_messages(Client& client) {
       send_message(client, message);
       std::cout << "###Unknown command: " << command << std::endl;
     }
+    client.received_messages_.pop_front();
   }
-  client.messages_.clear();
 }
 
 

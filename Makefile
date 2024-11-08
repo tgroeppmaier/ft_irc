@@ -1,11 +1,11 @@
 # CC = clang++
 CC = g++
-# CFLAGS = -Wall -Wextra -Werror -Weffc++ -Wconversion -Wsign-conversion -Wshadow -g -std=c++98 -Iincludes
+# CFLAGS = -Wall -Wextra -Werror -Weffc++ -Wconversion -Wsign-conversion -Wshadow -g -O2 -std=c++98 -Iincludes
 CFLAGS = -Wall -Wextra -Wconversion -Wsign-conversion -Wshadow -g -std=c++98 -Iincludes
 NAME = ircserv
-SRC = $(wildcard srcs/*.cpp)
+SRC = srcs/Channel.cpp srcs/Client.cpp srcs/IrcServ.cpp srcs/main.cpp srcs/MessageHandler.cpp
 OBJ = $(SRC:.cpp=.o)
-HEADER = $(wildcard includes/*.hpp)
+HEADER = includes/Channel.hpp includes/Client.hpp includes/IrcServ.hpp includes/MessageHandler.hpp
 
 all: $(NAME)
 
@@ -22,3 +22,5 @@ fclean: clean
 	rm -f $(NAME)
 
 re: fclean all
+
+.PHONY: all clean fclean re
