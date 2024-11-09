@@ -33,7 +33,7 @@ MessageHandler::~MessageHandler() {
 
 void MessageHandler::send_message(Client& client, std::string& message) {
   size_t length = message.length();
-  ssize_t bytes_sent = send(client.fd_, message.c_str(), length, 0);
+  ssize_t bytes_sent = send(client.fd_, message.c_str(), length, MSG_NOSIGNAL);
   if (bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
     // Modify the existing event to include EPOLLOUT
     epoll_event ev;
@@ -47,6 +47,7 @@ void MessageHandler::send_message(Client& client, std::string& message) {
   } 
   else if (bytes_sent == -1) {
     perror("Error sending message to client");
+    server_.close_client_fd(client.fd_);
   }
 }
 

@@ -1,5 +1,12 @@
 # ft_irc
 
+## Links
+https://ircgod.com/docs/irc/to_know/
+https://github.com/42-serv/ft_irc/wiki
+https://expserver.github.io/guides/resources/introduction-to-linux-epoll.html
+https://medium.com/@avocadi/what-is-epoll-9bbc74272f7c
+
+
 ## useful commands
 
 ``` bash

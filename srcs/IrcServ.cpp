@@ -5,12 +5,10 @@
 #include <sys/epoll.h>
 #include <fcntl.h>
 #include <cstdlib>
-// #include <pthread.h>
 #include <signal.h>
 
 #include "IrcServ.hpp"
 
-// using namespaceusing std string;
 using std::string;
 using std::cout;
 using std::cerr;
@@ -199,7 +197,7 @@ void IrcServ::event_loop() {
         ssize_t bytes_sent;
         while (!client->unsent_messages_.empty()) {
           string message = client->unsent_messages_.front();
-          bytes_sent = send(client->fd_, message.c_str(), message.length(), 0);
+          bytes_sent = send(client->fd_, message.c_str(), message.length(), MSG_NOSIGNAL);
           if (bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
             continue;;
           }
@@ -238,27 +236,3 @@ void IrcServ::event_loop() {
     }
   }
 }
-//         while ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
-//           buffer[bytes_read] = '\0';
-//           client->add_buffer_to(buffer);
-//           cout << buffer << endl; // for debug purposes
-//           new_data_added = true; 
-//         }
-//         if (new_data_added) {
-//           message_handler_->process_incoming_messages(*client);
-//           // for (vector<string>::iterator it = client->messages_.begin(); it != client->messages_.end(); ++it) {
-//           //   cout << *it << endl;
-//           // }
-//         }
-//         if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {
-//           if (bytes_read == 0) {
-//               cout << "Client disconnected" << endl;
-//           } else {
-//               perror("Error. Failed to read from client");
-//           }
-//           close_client_fd(client_fd);
-//         }
-//       }
-//     }
-//   }
-// }
