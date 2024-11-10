@@ -23,7 +23,9 @@ private:
   // std::deque<UnsentMessage> unsent_messages_;
 
   // void split_buffer(Client& client);
-  void send_message(Client& client, std::string& message);
+  void process_messages(Client& client, const std::string& message);
+
+  void save_message(Client& client, std::string& message);
 
 public:
   MessageHandler(IrcServ& server);
@@ -31,6 +33,7 @@ public:
 
   void process_incoming_messages(Client& client);
 
+  void send_messages(Client& client);
   // Command handling functions
   void command_CAP(Client& client, std::vector<std::string>& arguments);
   void command_NICK(Client& client, std::vector<std::string>& arguments);

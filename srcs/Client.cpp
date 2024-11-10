@@ -15,9 +15,9 @@ Client::Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len)
     hostname_(""),
     servername_(""),
     realname_(""),
-    buffer_msg_to_(""),
-    buffer_msg_from_(""),
-    received_messages_() {
+    buffer_in("")
+    // received_messages_() 
+    {
 }
 
 Client::~Client() {
@@ -28,22 +28,22 @@ Client::~Client() {
 
 void Client::add_buffer_to(const char* message) {
   if (message) {
-    buffer_msg_from_.append(message);
+    buffer_in.append(message);
   }
 }
 
-void Client::split_buffer() {
-  if (buffer_msg_from_.empty()) {
-    return;
-  }
-  size_t start = 0;
-  size_t end;
-  while ((end = buffer_msg_from_.find("\r\n", start)) != std::string::npos) {
-    received_messages_.push_back(buffer_msg_from_.substr(start, end - start));
-    start = end + 2;
-  }
-  if (start > buffer_msg_from_.size()) {
-    start -= 2;
-  }
-  buffer_msg_from_.erase(0, start);
-}
+// void Client::split_buffer() {
+//   if (buffer_in.empty()) {
+//     return;
+//   }
+//   size_t start = 0;
+//   size_t end;
+//   while ((end = buffer_in.find("\r\n", start)) != std::string::npos) {
+//     received_messages_.push_back(buffer_in.substr(start, end - start));
+//     start = end + 2;
+//   }
+//   if (start > buffer_in.size()) {
+//     start -= 2;
+//   }
+//   buffer_in.erase(0, start);
+// }

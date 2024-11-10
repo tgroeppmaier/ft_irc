@@ -3,3 +3,4 @@ client
 ircserv
 test/
 *.zst
+vgcore.*

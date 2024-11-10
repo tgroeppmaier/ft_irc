@@ -98,6 +98,11 @@ void IrcServ::register_signal_handlers() {
       perror("Error registering SIGTERM handler");
       exit(EXIT_FAILURE);
   }
+ 
+  if (sigaction(SIGSEGV, &sa, NULL) == -1) {
+      perror("Error registering SIGSEGV handler");
+      exit(EXIT_FAILURE);
+  }
 }
 
 void IrcServ::set_non_block(int sock_fd) {
@@ -191,36 +196,16 @@ void IrcServ::event_loop() {
         }
         clients_[client_fd] = new Client(client_fd, client_addr, addr_len);
       }
-      else if (events[i].events & EPOLLOUT) { // client fd is ready again
-        client_fd = events[i].data.fd;
-        Client* client = clients_[client_fd];
-        ssize_t bytes_sent;
-        while (!client->unsent_messages_.empty()) {
-          string message = client->unsent_messages_.front();
-          bytes_sent = send(client->fd_, message.c_str(), message.length(), MSG_NOSIGNAL);
-          if (bytes_sent == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
-            continue;;
-          }
-          cout << "unsent message sent: " << message << endl;
-          client->unsent_messages_.pop_front();
-        }
-        epoll_event ev;
-        ev.events = EPOLLIN; // Listen for input events
-        ev.data.fd = client->fd_;
-        if (epoll_ctl(ep_fd_, EPOLL_CTL_MOD, client->fd_, &ev) == -1) {
-          perror("Error modifying client socket to EPOLLIN");
-        }
-      }
-      else { // event on client fd (incoming message)
+      else if (events[i].events & EPOLLIN) { // event on client fd (incoming message)
         client_fd = events[i].data.fd;
         Client* client = clients_[client_fd];
         ssize_t bytes_read;
-        char buffer[513];
+        char buffer[4096];
         // bool new_data_added = false; 
         if ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
-          cout << buffer << endl; // debug purposes
+          // cout << buffer << endl; // debug purposes
           message_handler_->process_incoming_messages(*client);
         } 
         else if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {
@@ -232,6 +217,11 @@ void IrcServ::event_loop() {
           }
           close_client_fd(client_fd);
         }
+      }
+      else if (events[i].events & EPOLLOUT) { // fd is ready to send
+        client_fd = events[i].data.fd;
+        Client* client = clients_[client_fd];
+        message_handler_->send_messages(*client);
       }
     }
   }
