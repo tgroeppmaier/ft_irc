@@ -10,22 +10,10 @@
 
 class IrcServ;
 
-
-struct UnsentMessage {
-  int fd;
-  const char* message;
-  size_t length;
-};
-
 class MessageHandler {
 private:
   IrcServ& server_;
-  // std::deque<UnsentMessage> unsent_messages_;
-
-  // void split_buffer(Client& client);
   void process_messages(Client& client, const std::string& message);
-
-  void save_message(Client& client, std::string& message);
 
 public:
   MessageHandler(IrcServ& server);
@@ -40,6 +28,7 @@ public:
   void command_USER(Client& client, std::vector<std::string>& arguments);
   void command_PING(Client& client, std::vector<std::string>& arguments);
   void command_QUIT(Client& client, std::vector<std::string>& arguments);
+  void command_JOIN(Client& client, std::vector<std::string>& arguments);
   void reply_ERR_NEEDMOREPARAMS(Client& client, std::vector<std::string>& arguments);
 
   // Map of command strings to function pointers

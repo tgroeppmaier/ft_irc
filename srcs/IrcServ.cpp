@@ -1,10 +1,9 @@
 #include <arpa/inet.h>
-#include <unistd.h>
 #include <cstring>
 #include <stdio.h>
 #include <sys/epoll.h>
 #include <fcntl.h>
-#include <cstdlib>
+// #include <cstdlib>
 #include <signal.h>
 
 #include "IrcServ.hpp"
@@ -54,7 +53,7 @@ void IrcServ::signal_handler(int signal) {
 void IrcServ::close_socket(int fd) {
   if (fd != static_cast<uint16_t>(-1)) {
     if (close(fd) == -1) {
-      std::cerr << "Error closing socket " << fd << ": " << std::strerror(errno) << std::endl;
+      perror("Error closing socket");
     } else {
       std::cout << "Socket " << fd << " closed successfully." << std::endl;
     }
@@ -63,7 +62,7 @@ void IrcServ::close_socket(int fd) {
 
 void IrcServ::close_client_fd(int client_fd) {
   if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
-      perror("Error removing client socket from epoll");
+    perror("Error removing client socket from epoll");
   }
   delete clients_[client_fd];
   clients_.erase(client_fd);
@@ -99,20 +98,20 @@ void IrcServ::register_signal_handlers() {
       exit(EXIT_FAILURE);
   }
  
-  if (sigaction(SIGSEGV, &sa, NULL) == -1) {
-      perror("Error registering SIGSEGV handler");
-      exit(EXIT_FAILURE);
-  }
+  // if (sigaction(SIGSEGV, &sa, NULL) == -1) {
+  //     perror("Error registering SIGSEGV handler");
+  //     exit(EXIT_FAILURE);
+  // }
 }
 
 void IrcServ::set_non_block(int sock_fd) {
   int flags = fcntl(sock_fd, F_GETFL, 0);
   if (flags == -1) {
-    cerr << "Error. Failed to get socket flags: " << strerror(errno) << endl;
+    perror("Error. Failed to get socket flags");
     exit(EXIT_FAILURE);
   }
   if (fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-    cerr << "Error. Failed to set socket to non-blocking mode: " << strerror(errno) << endl;
+    perror("Error. Failed to set socket to non-blocking mode");
     exit(EXIT_FAILURE);
   }
 }
@@ -128,7 +127,7 @@ void IrcServ::start() {
   register_signal_handlers();
   server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
   if (server_fd_ == -1) {
-    cerr << "Error. Failed to create socket" << strerror(errno) << endl;
+    perror("Error. Failed to create socket");
     exit(EXIT_FAILURE);
   }
   set_non_block(server_fd_);
@@ -150,12 +149,12 @@ void IrcServ::start() {
   }
 
   if (bind(server_fd_, (sockaddr*)&server_addr_, sizeof(server_addr_)) == -1) {
-    cerr << "Error. Failed to bind to port " << port_ << " " << strerror(errno) << endl;
+    perror("Error. Failed binding on port");
     exit(EXIT_FAILURE);
   }
 
   if (listen(server_fd_, 10) == -1) {
-    cerr << "Error. Failed to listen on socket " << strerror(errno) << endl;
+    perror("Error. Failed to listen on socket");
     exit(EXIT_FAILURE);
   }
   cout << "Server started on port " << port_ << endl;
@@ -201,7 +200,6 @@ void IrcServ::event_loop() {
         Client* client = clients_[client_fd];
         ssize_t bytes_read;
         char buffer[4096];
-        // bool new_data_added = false; 
         if ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
@@ -218,7 +216,7 @@ void IrcServ::event_loop() {
           close_client_fd(client_fd);
         }
       }
-      else if (events[i].events & EPOLLOUT) { // fd is ready to send
+      else if (events[i].events & EPOLLOUT) { // fd is ready to send messages
         client_fd = events[i].data.fd;
         Client* client = clients_[client_fd];
         message_handler_->send_messages(*client);
