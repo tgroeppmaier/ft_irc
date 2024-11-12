@@ -42,6 +42,25 @@ IrcServ::IrcServ(int port, string password) :
 IrcServ::~IrcServ() {
 }
 
+void IrcServ::create_channel(const std::string& name, Client& admin) {
+  Channel* channel = new Channel(name, admin);
+  channels_[name] = channel;
+  admin.channels_[name] = channel;
+  admin.channels_[name] = channel;
+
+  // Create and send JOIN message
+  std::string join_message = ":" + admin.nick_ + "!" + admin.username_ + "@" + admin.hostname_ + " JOIN " + name + "\r\n";
+  send(admin.fd_, join_message.c_str(), join_message.length(), MSG_NOSIGNAL);
+
+  // Create and send 353 (RPL_NAMREPLY) message
+  std::string namreply_message = std::string(inet_ntoa(server_addr_.sin_addr)) + " 353 " + admin.nick_ + " = " + name + " :" + admin.nick_ + "\r\n";
+  send(admin.fd_, namreply_message.c_str(), namreply_message.length(), MSG_NOSIGNAL);
+
+  // Create and send 366 (RPL_ENDOFNAMES) message
+  std::string endofnames_message = std::string(inet_ntoa(server_addr_.sin_addr)) + " 366 " + admin.nick_ + " " + name + " :End of /NAMES list\r\n";
+  send(admin.fd_, endofnames_message.c_str(), endofnames_message.length(), MSG_NOSIGNAL);
+}
+
 void IrcServ::signal_handler(int signal) {
   cout << "Signal " << signal << " received, cleaning up and exiting..." << endl;
   if (instance_) {
@@ -79,7 +98,15 @@ void IrcServ::cleanup() {
     delete it->second;
   }
   clients_.clear();
+
+  for (std::map<string, Channel*>::iterator it = channels_.begin(); it != channels_.end(); ++it) {
+    delete it->second;
+  }
+  channels_.clear();
+
   delete message_handler_;
+
+
 }
 
 void IrcServ::register_signal_handlers() {

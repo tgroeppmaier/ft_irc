@@ -8,7 +8,9 @@
 #include "IrcServ.hpp"
 
 
+
 class IrcServ;
+class Channel;
 
 class MessageHandler {
 private:

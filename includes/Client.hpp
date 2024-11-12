@@ -5,7 +5,11 @@
 #include <string>
 #include <vector>
 #include <queue>
+#include <map>
+#include "Channel.hpp"
 
+
+class Channel;
 
 class Client {
 private:
@@ -22,6 +26,8 @@ public:
   std::string realname_;
   std::string messages_incoming_;
   std::string messages_outgoing_;
+
+  std::map<std::string, Channel*> channels_;
 
   Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len_);
   ~Client();

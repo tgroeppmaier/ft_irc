@@ -4,3 +4,7 @@ ircserv
 test/
 *.zst
 vgcore.*
+*.xml
+.vscode/
+.idea/
+.tests/

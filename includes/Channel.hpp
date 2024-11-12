@@ -9,13 +9,14 @@
 #include "Client.hpp"
 // #include "IrcServ.hpp"
 
+class Client;
 
 class Channel {
 private:
   std::string name_;
   
 public:
-  Channel(std::string name, Client& admin);
+  Channel(const std::string name, Client& admin);
   ~Channel();
   std::map<int, Client*> clients_;
   std::map<int, Client*> admins_;

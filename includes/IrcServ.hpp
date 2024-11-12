@@ -46,6 +46,8 @@ public:
   void close_socket(int fd);
   void close_client_fd(int fd);
 
+  void create_channel(const std::string& name, Client& admin);
+
   // IrcServ(const IrcServ &other);
   // IrcServ &operator=(const IrcServ &other);
 

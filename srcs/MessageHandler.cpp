@@ -3,6 +3,7 @@
 #include <sstream>
 #include <cstdio>
 #include <sys/epoll.h>
+#include <string>
 #include <arpa/inet.h> // For inet_ntoa
 
 
@@ -70,9 +71,11 @@ void MessageHandler::process_incoming_messages(Client& client) {
     start = end + 2;
     std::stringstream ss(message);
     vector<string> arg;
-    string tmp;
-    string command;
-    ss >> command;
+    string tmp, command;
+    if (!(ss >> command)) {
+      std::cerr << "Error extracting command" << std::endl;
+      return;
+    }
     while (ss >> tmp) {
       arg.push_back(tmp);
     }
@@ -134,10 +137,33 @@ void MessageHandler::command_QUIT(Client& client, std::vector<std::string>& argu
   server_.close_client_fd(client.fd_);
 }
 
-void MessageHandler::command_JOIN(Client& client, std::vector<std::string>& arguments) {
-  
-  cout << "closing fd: " << client.fd_ << std::endl;
-  server_.close_client_fd(client.fd_);
+void MessageHandler::command_JOIN(Client& client, std::vector<std::string>& arg) {
+  vector<string> tokens;
+
+  for (vector<string>::const_iterator it = arg.begin(); it != arg.end(); ++it) {
+    string token;
+    std::stringstream ss(*it);
+    while(std::getline(ss, token, ',')) {
+      if (!token.empty()) {
+        tokens.push_back(token);
+      }
+    }
+  }
+  vector<string> channels;
+  vector<string> keys;
+  for (vector<string>::const_iterator it = tokens.begin(); it != tokens.end(); ++it) {
+    string tmp = *it;
+    if (!tmp.empty() && (tmp[0] == '#' || tmp[0] == '&')) {
+      channels.push_back(tmp);
+    }
+    else {
+      keys.push_back(tmp);
+    }
+  }
+  map<string, Channel*>::iterator it = server_.channels_.find(channels[0]);
+  if (it == server_.channels_.end()) {
+    server_.create_channel(channels[0], client);
+  }
 }
 
 void MessageHandler::command_USER(Client& client, std::vector<std::string>& arguments) {
