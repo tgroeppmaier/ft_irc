@@ -8,3 +8,5 @@ vgcore.*
 .vscode/
 .idea/
 .tests/
+tests/MessageHandlerTest.cpp
+tests/test_messagehandler.cpp

@@ -16,6 +16,7 @@
 
 class MessageHandler;
 class Channel;
+class Client;
 
 class IrcServ {
 private:
@@ -44,9 +45,14 @@ public:
   ~IrcServ();
   IrcServ(int port, std::string password);
   void close_socket(int fd);
-  void close_client_fd(int fd);
+  void delete_client(int fd);
 
   void create_channel(const std::string& name, Client& admin);
+  void join_channel(const std::string& name, Client& admin);
+
+  void epoll_in_out(int fd);
+
+  Channel* get_channel(const std::string& name);
 
   // IrcServ(const IrcServ &other);
   // IrcServ &operator=(const IrcServ &other);

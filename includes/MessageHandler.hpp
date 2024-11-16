@@ -11,11 +11,12 @@
 
 class IrcServ;
 class Channel;
+class Client;
 
 class MessageHandler {
 private:
   IrcServ& server_;
-  void process_messages(Client& client, const std::string& message);
+  // void process_messages(Client& client, const std::string& message);
 
 public:
   MessageHandler(IrcServ& server);
@@ -31,7 +32,15 @@ public:
   void command_PING(Client& client, std::vector<std::string>& arguments);
   void command_QUIT(Client& client, std::vector<std::string>& arguments);
   void command_JOIN(Client& client, std::vector<std::string>& arguments);
+  void command_MODE(Client& client, std::vector<std::string>& arguments);
+  void command_PRIVMSG(Client& client, std::vector<std::string>& arguments);
   void reply_ERR_NEEDMOREPARAMS(Client& client, std::vector<std::string>& arguments);
+
+  void handle_channel_mode(Client& client, const std::string& channel_name, std::vector<std::string>& arguments);
+  // void handle_user_mode(Client& client, const std::string& target_nick, std::vector<std::string>& arguments);
+
+
+
 
   // Map of command strings to function pointers
   std::map<std::string, void(MessageHandler::*)(Client&, std::vector<std::string>&)> command_map_;

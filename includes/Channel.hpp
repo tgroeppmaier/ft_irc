@@ -6,20 +6,32 @@
 // #include <vector>
 #include <map>
 #include <string>
+#include <deque>
 #include "Client.hpp"
+#include "IrcServ.hpp"
 // #include "IrcServ.hpp"
 
 class Client;
+class IrcServ;
 
 class Channel {
 private:
-  std::string name_;
-  
+  int user_limit_;
+  IrcServ& server_;
+
+
 public:
-  Channel(const std::string name, Client& admin);
+  Channel(IrcServ& server, const std::string name, Client& admin);
   ~Channel();
+  // vector<int> users_;
+  // vector<int> operators_;
+  std::string name_;
   std::map<int, Client*> clients_;
   std::map<int, Client*> admins_;
+
+  void join_message_to_all(Client& client);
+  void broadcast(int sender_fd, const std::string& message);
+  std::deque<std::pair<int, std::string> > get_users();
 
 };
 

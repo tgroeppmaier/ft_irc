@@ -33,6 +33,7 @@ public:
   ~Client();
 
   void add_buffer_to(const char* message);
+  void add_message_out(const std::string message);
 
 };
 

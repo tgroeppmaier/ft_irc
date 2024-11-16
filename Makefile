@@ -1,7 +1,7 @@
 # CC = clang++
 CC = g++
 # CFLAGS = -Wall -Wextra -Werror -Weffc++ -Wconversion -Wsign-conversion -Wshadow -g -O2 -std=c++98 -Iincludes
-CFLAGS = -Wall -Wextra -Wconversion -Wsign-conversion -Wshadow -g -std=c++98 -Iincludes
+CFLAGS = -Wall -Wextra -Wpedantic -Wconversion -Wsign-conversion -Wshadow -g -std=c++98 -Iincludes
 NAME = ircserv
 SRC = srcs/Channel.cpp srcs/Client.cpp srcs/IrcServ.cpp srcs/main.cpp srcs/MessageHandler.cpp
 OBJ = $(SRC:.cpp=.o)

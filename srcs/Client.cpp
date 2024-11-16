@@ -30,3 +30,7 @@ void Client::add_buffer_to(const char* message) {
     messages_incoming_.append(message);
   }
 }
+
+void Client::add_message_out(const std::string message) {
+  messages_outgoing_.append(message);
+}

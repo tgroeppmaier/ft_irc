@@ -12,6 +12,7 @@ using std::string;
 using std::cout;
 using std::cerr;
 using std::endl;
+using std::map;
 
 
 IrcServ* IrcServ::instance_ = NULL;
@@ -42,23 +43,70 @@ IrcServ::IrcServ(int port, string password) :
 IrcServ::~IrcServ() {
 }
 
+void IrcServ::epoll_in_out(int client_fd) {
+  epoll_event ev;
+  ev.events = EPOLLIN | EPOLLOUT; // Listen for both input and output events
+  ev.data.fd = client_fd;
+  if (epoll_ctl(ep_fd_, EPOLL_CTL_MOD, client_fd, &ev) == -1) {
+    perror("Error modifying client socket to include EPOLLOUT");
+    return;
+  }
+  // cout << "Client fd " << client_fd << " modified to in out Events" << endl;
+}
+
+
+void IrcServ::join_channel(const std::string& name, Client& client) {
+  Channel* channel = channels_[name];
+  channel->clients_[client.fd_] = &client;
+  // channels_[name]->clients_[client.fd_] = &client;
+  client.channels_[name] = channel;
+
+  // channel->join_message_to_all(client);  
+
+  string join_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " JOIN " + name + "\r\n";
+
+  // Create and send 353 (RPL_NAMREPLY) message
+  string users;
+  map<int, Client*>::const_iterator it = channels_[name]->clients_.begin();
+  for (; it != channels_[name]->clients_.end(); ++it) {
+    users += it->second->nick_ + ' ';
+    it->second->messages_outgoing_.append(join_message);
+    epoll_in_out(it->first);
+  }
+  std::string namreply_message = "353 " + client.nick_ + " = " + name + " :" + users + "\r\n";
+  client.messages_outgoing_.append(namreply_message);
+
+  // Create and send 366 (RPL_ENDOFNAMES) message
+  std::string endofnames_message = "366 " + client.nick_ + " " + name + " :End of /NAMES list\r\n";
+  client.messages_outgoing_.append(endofnames_message);
+
+}
+
+Channel* IrcServ::get_channel(const std::string& name) {
+  map<const string, Channel*>::const_iterator it = channels_.find(name);
+  if (it == channels_.end()) {
+    return NULL;
+  }
+  return it->second;
+}
+
+
 void IrcServ::create_channel(const std::string& name, Client& admin) {
-  Channel* channel = new Channel(name, admin);
+  Channel* channel = new Channel(*this, name, admin);
   channels_[name] = channel;
-  admin.channels_[name] = channel;
   admin.channels_[name] = channel;
 
   // Create and send JOIN message
   std::string join_message = ":" + admin.nick_ + "!" + admin.username_ + "@" + admin.hostname_ + " JOIN " + name + "\r\n";
-  send(admin.fd_, join_message.c_str(), join_message.length(), MSG_NOSIGNAL);
+  admin.messages_outgoing_.append(join_message);
 
   // Create and send 353 (RPL_NAMREPLY) message
-  std::string namreply_message = std::string(inet_ntoa(server_addr_.sin_addr)) + " 353 " + admin.nick_ + " = " + name + " :" + admin.nick_ + "\r\n";
-  send(admin.fd_, namreply_message.c_str(), namreply_message.length(), MSG_NOSIGNAL);
+  std::string namreply_message = "353 " + admin.nick_ + " = " + name + " :" + admin.nick_ + "\r\n";
+  admin.messages_outgoing_.append(namreply_message);
 
   // Create and send 366 (RPL_ENDOFNAMES) message
-  std::string endofnames_message = std::string(inet_ntoa(server_addr_.sin_addr)) + " 366 " + admin.nick_ + " " + name + " :End of /NAMES list\r\n";
-  send(admin.fd_, endofnames_message.c_str(), endofnames_message.length(), MSG_NOSIGNAL);
+  std::string endofnames_message = "366 " + admin.nick_ + " " + name + " :End of /NAMES list\r\n";
+  admin.messages_outgoing_.append(endofnames_message);
 }
 
 void IrcServ::signal_handler(int signal) {
@@ -79,7 +127,7 @@ void IrcServ::close_socket(int fd) {
   }
 }
 
-void IrcServ::close_client_fd(int client_fd) {
+void IrcServ::delete_client(int client_fd) {
   if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
     perror("Error removing client socket from epoll");
   }
@@ -93,9 +141,12 @@ void IrcServ::cleanup() {
   close_socket(ep_fd_);
 
   // Close and delete all client connections
+  std::vector<int> client_fds;
   for (std::map<int, Client*>::iterator it = clients_.begin(); it != clients_.end(); ++it) {
-    close_client_fd(it->first);
-    delete it->second;
+    client_fds.push_back(it->first);
+  }
+  for (std::vector<int>::iterator it = client_fds.begin(); it != client_fds.end(); ++it) {
+    delete_client(*it);
   }
   clients_.clear();
 
@@ -105,8 +156,6 @@ void IrcServ::cleanup() {
   channels_.clear();
 
   delete message_handler_;
-
-
 }
 
 void IrcServ::register_signal_handlers() {
@@ -230,7 +279,7 @@ void IrcServ::event_loop() {
         if ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
-          // cout << buffer << endl; // debug purposes
+          cout << "\033[31m" << buffer << "\033[0m" << endl; // debug purposes       
           message_handler_->process_incoming_messages(*client);
         } 
         else if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {
@@ -240,7 +289,7 @@ void IrcServ::event_loop() {
           } else {
               perror("Error. Failed to read from client");
           }
-          close_client_fd(client_fd);
+          delete_client(client_fd);
         }
       }
       else if (events[i].events & EPOLLOUT) { // fd is ready to send messages
