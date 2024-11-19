@@ -16,8 +16,10 @@ class IrcServ;
 
 class Channel {
 private:
-  int user_limit_;
   IrcServ& server_;
+  std::string password_;
+  int user_limit_;
+  std::string name_;
 
 
 public:
@@ -25,7 +27,6 @@ public:
   ~Channel();
   // vector<int> users_;
   // vector<int> operators_;
-  std::string name_;
   std::map<int, Client*> clients_;
   std::map<int, Client*> admins_;
 

@@ -12,6 +12,7 @@ using std::string;
 using std::deque;
 using std::map;
 using std::cout;
+using std::stringstream;
 
 MessageHandler::MessageHandler(IrcServ& server) : server_(server) {
   command_map_["CAP"] = &MessageHandler::command_CAP;
@@ -72,18 +73,14 @@ void MessageHandler::process_incoming_messages(Client& client) {
     // cout << message << std::endl; // DEBUG
     start = end + 2;
     std::stringstream ss(message);
-    vector<string> arg;
-    string tmp, command;
+    string command;
     if (!(ss >> command)) {
       std::cerr << "Error extracting command" << std::endl;
       return;
     }
-    while (ss >> tmp) {
-      arg.push_back(tmp);
-    }
-    map<string, void(MessageHandler::*)(Client&, vector<string>&)>::iterator cmd_it = command_map_.find(command);
+    map<string, void(MessageHandler::*)(Client&, stringstream&)>::const_iterator cmd_it = command_map_.find(command);
     if (cmd_it != command_map_.end()) {
-        (this->*(cmd_it->second))(client, arg);
+        (this->*(cmd_it->second))(client, ss);
         if (command == "QUIT") 
           return;
     } else {
@@ -97,193 +94,249 @@ void MessageHandler::process_incoming_messages(Client& client) {
   // cout << client.messages_outgoing_ << std::endl; // DEBUG
 }
 
-void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, std::vector<std::string>& arguments) {
-  if (!arguments[0].empty()) {
-    string message  = "461 " + client.nick_ + " " + arguments[0] + " :Not enough parameters\r\n";
+void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, const string& command) {
+  if (!command.empty()) {
+    string message  = "461 " + client.nick_ + " " + command + " :Not enough parameters\r\n";
     client.messages_outgoing_.append(message);
     server_.epoll_in_out(client.fd_);
   }
 }
 
-void MessageHandler::command_CAP(Client& client, vector<string>& arguments) {
+void MessageHandler::command_CAP(Client& client, std::stringstream& message) {
   std::cout << "Handling CAP command for client " << client.fd_ << std::endl;
 }
 
-void MessageHandler::command_NICK(Client& client, std::vector<std::string>& arguments) {
-  if (!arguments[0].empty()) {
-    client.nick_ = arguments[0];
+void MessageHandler::command_NICK(Client& client, std::stringstream& message) {
+  string nick;
+  if (message >> nick) {
+    client.nick_ = nick;
   }
   else {
-    reply_ERR_NEEDMOREPARAMS(client, arguments);
+    reply_ERR_NEEDMOREPARAMS(client, "NICK");
   }
   std::cout << "Handling NICK command for client " << client.nick_<< std::endl;
 }
 
-void MessageHandler::command_PING(Client& client, std::vector<std::string>& arguments) {
-  if (!arguments[0].empty()) {
-    string message = "PONG \r\n";
-    client.messages_outgoing_.append(message);
-  }
-  else {
-    reply_ERR_NEEDMOREPARAMS(client, arguments);
-  }
-}
 
-void MessageHandler::command_QUIT(Client& client, std::vector<std::string>& arguments) {
-  cout << "closing fd: " << client.fd_ << std::endl;
-  server_.delete_client(client.fd_);
-}
+void MessageHandler::command_USER(Client& client, std::stringstream& message) {
+  std::string username, hostname, servername, realname;
 
-void MessageHandler::command_JOIN(Client& client, std::vector<std::string>& arg) {
-  vector<string> tokens;
-
-  for (vector<string>::const_iterator it = arg.begin(); it != arg.end(); ++it) {
-    string token;
-    std::stringstream ss(*it);
-    while(std::getline(ss, token, ',')) {
-      if (!token.empty()) {
-        tokens.push_back(token);
-      }
-    }
-  }
-  vector<string> channels;
-  vector<string> keys;
-  for (vector<string>::const_iterator it = tokens.begin(); it != tokens.end(); ++it) {
-    string tmp = *it;
-    if (!tmp.empty() && (tmp[0] == '#' || tmp[0] == '&')) {
-      channels.push_back(tmp);
-    }
-    else {
-      keys.push_back(tmp);
-    }
-  }
-  map<string, Channel*>::iterator it = server_.channels_.find(channels[0]);
-  if (it == server_.channels_.end()) {
-    server_.create_channel(channels[0], client);
-  }
-  else {
-    server_.join_channel(channels[0], client);
-  }
-}
-
-void MessageHandler::command_PRIVMSG(Client& sender, std::vector<std::string>& arguments) {
-  if (arguments.empty()) {
-    reply_ERR_NEEDMOREPARAMS(sender, arguments);
+  if (!(message >> username >> hostname >> servername)) {
+    reply_ERR_NEEDMOREPARAMS(client, "USER");
     return;
   }
 
-  std::string target = arguments[0];
-  // Channel* channel;
-
-  // Target is a channel
-  if (target[0] == '#' || target[0] == '&') {
-    Channel* channel = server_.get_channel(target);
-    if (channel == NULL) {
-      std::string message = "403 " + sender.nick_ + " " + target + " :No such channel\r\n";
-      sender.messages_outgoing_.append(message);
-      server_.epoll_in_out(sender.fd_);
-      return;
-    }
-    std::ostringstream oss;
-    oss << ":" << sender.nick_ << "!" << sender.username_ << " PRIVMSG " << channel->name_ << " ";
-     // Append the message content from the arguments
-    for (size_t i = 1; i < arguments.size(); ++i) {
-      if (i > 1) {
-        oss << " ";
-      }
-      oss << arguments[i];
-    }
-    oss << "\r\n";
-
-    // Broadcast the message to the channel
-    // std::string message = oss.str();
-    channel->broadcast(sender.fd_, oss.str());
-    cout << "Broadcast: " << oss.str() << std::endl;
-
-    // Handle sending message to the channel
-  } else {
-    // Handle sending message to a user
-  }
-}
-
-
-
-void MessageHandler::command_USER(Client& client, std::vector<std::string>& arguments) {
-  // print_args(client, arguments);
-
-  if (arguments.size() < 4) {
-    reply_ERR_NEEDMOREPARAMS(client, arguments);
+  // Extract the realname which may contain spaces
+  std::getline(message >> std::ws, realname);
+  if (realname.empty()) {
+    reply_ERR_NEEDMOREPARAMS(client, "USER");
     return;
   }
 
-  client.username_ = arguments[0];
-  client.hostname_ = arguments[1];
-  client.servername_ = arguments[2];
-  client.realname_ = arguments[3];
+  client.username_ = username;
+  client.hostname_ = hostname;
+  client.servername_ = servername;
+  client.realname_ = realname;
 
-  std::string message = "001 " + client.nick_ + " :Welcome to the IRC server\r\n";
-  client.messages_outgoing_.append(message);
+  std::ostringstream oss;
 
-  message = "002 " + client.nick_ + " :Your host is " + std::string(inet_ntoa(server_.server_addr_.sin_addr)) + ", running version 1.0\r\n";
-  client.messages_outgoing_.append(message);
+  oss << "001 " << client.nick_ << " :Welcome to the IRC server\r\n";
+  client.messages_outgoing_.append(oss.str());
+  oss.str(""); // Clear the stream
 
-  message = "003 " + client.nick_ + " :This server was created today\r\n";
-  client.messages_outgoing_.append(message);
+  oss << "002 " << client.nick_ << " :Your host is " << inet_ntoa(server_.server_addr_.sin_addr) << ", running version 1.0\r\n";
+  client.messages_outgoing_.append(oss.str());
+  oss.str(""); // Clear the stream
 
-  message = "004 " + client.nick_ + " " + std::string(inet_ntoa(server_.server_addr_.sin_addr)) + " 1.0 o o\r\n";
-  client.messages_outgoing_.append(message);
+  oss << "003 " << client.nick_ << " :This server was created today\r\n";
+  client.messages_outgoing_.append(oss.str());
+  oss.str(""); // Clear the stream
 
-  message = "005 " + client.nick_ + " :Some additional information\r\n";
-  client.messages_outgoing_.append(message);
+  oss << "004 " << client.nick_ << " " << inet_ntoa(server_.server_addr_.sin_addr) << " 1.0 o o\r\n";
+  client.messages_outgoing_.append(oss.str());
+  oss.str(""); // Clear the stream
+
+  oss << "005 " << client.nick_ << " :Some additional information\r\n";
+  client.messages_outgoing_.append(oss.str());
 
   std::cout << "Handling USER command for client " << client.username_ << std::endl;
 }
 
 
+void MessageHandler::command_PING(Client& client, std::stringstream& message) {
+  string target;
+  if (message >> target) {
+    string reply = "PONG \r\n";
+    client.messages_outgoing_.append(reply);
+  }
+  else {
+    reply_ERR_NEEDMOREPARAMS(client, "PING");
+  }
+}
 
-void MessageHandler::command_MODE(Client& client, std::vector<std::string>& arguments) {
-  if (arguments.empty()) {
-    reply_ERR_NEEDMOREPARAMS(client, arguments);
+void MessageHandler::command_QUIT(Client& client, std::stringstream& arguments) {
+  cout << "closing fd: " << client.fd_ << std::endl;
+  server_.delete_client(client.fd_);
+}
+
+void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
+  std::string channels_str;
+  std::string keys_str;
+
+  // Extract the channels and keys from the message
+  if (!(message >> channels_str)) {
+    reply_ERR_NEEDMOREPARAMS(client, "JOIN");
+    return;
+  }
+  std::getline(message, keys_str);
+
+  // Split the channels and keys by comma
+  std::vector<std::string> channels;
+  std::vector<std::string> keys;
+  std::stringstream ss_channels(channels_str);
+  std::stringstream ss_keys(keys_str);
+
+  std::string token;
+  while (std::getline(ss_channels, token, ',')) {
+    if (!token.empty()) {
+      channels.push_back(token);
+    }
+  }
+  while (std::getline(ss_keys, token, ',')) {
+    if (!token.empty()) {
+      keys.push_back(token);
+    }
+  }
+
+  // Process each channel
+  for (size_t i = 0; i < channels.size(); ++i) {
+    std::string channel_name = channels[i];
+    if (channel_name[0] != '#' && channel_name[0] != '&') {
+      // Invalid channel name, send error message
+      std::string error_message = "403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
+      client.messages_outgoing_.append(error_message);
+      server_.epoll_in_out(client.fd_);
+      continue;
+    }
+
+    std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
+    if (it == server_.channels_.end()) {
+      server_.create_channel(channel_name, client);
+    } else {
+      server_.join_channel(channel_name, client);
+    }
+  }
+}
+
+void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message) {
+  std::string target;
+  if (!(message >> target)) {
+    reply_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
     return;
   }
 
-  std::string target = arguments[0];
+  // Extract the remaining message content from the current position
+  std::string message_content = message.str().substr(static_cast<std::string::size_type>(message.tellg()));
+  if (message_content.empty()) {
+    reply_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
+    return;
+  }
+
+  // Remove leading whitespace from message_content if present
+  message_content.erase(0, message_content.find_first_not_of(' '));
+
+  // Remove leading ':' if present
+  if (!message_content.empty() && message_content[0] == ':') {
+    message_content.erase(0, 1);
+  }
+
+  // Target is a channel
+  if (target[0] == '#' || target[0] == '&') {
+    Channel* channel = server_.get_channel(target);
+    if (channel == NULL) {
+      std::ostringstream oss;
+      oss << "403 " << sender.nick_ << " " << target << " :No such channel\r\n";
+      sender.messages_outgoing_.append(oss.str());
+      server_.epoll_in_out(sender.fd_);
+      return;
+    }
+
+    // Construct the PRIVMSG message
+    std::ostringstream oss;
+    oss << ":" << sender.nick_ << "!" << sender.username_ << "@" << sender.hostname_ << " PRIVMSG " << target << " :" << message_content << "\r\n";
+
+    // Broadcast the message to the channel
+    channel->broadcast(sender.fd_, oss.str());
+    std::cout << "Broadcast: " << oss.str() << std::endl;
+
+  } else {
+    // Handle sending message to a user
+    // Client* target_client = server_.get_client_by_nick(target);
+    // if (target_client == NULL) {
+    //   std::ostringstream oss;
+    //   oss << "401 " << sender.nick_ << " " << target << " :No such nick/channel\r\n";
+    //   sender.messages_outgoing_.append(oss.str());
+    //   server_.epoll_in_out(sender.fd_);
+    //   return;
+    // }
+
+    // // Construct the PRIVMSG message
+    // std::ostringstream oss;
+    // oss << ":" << sender.nick_ << "!" << sender.username_ << "@" << sender.hostname_ << " PRIVMSG " << target_client->nick_ << " :" << message_content << "\r\n";
+
+    // // Send the message to the target client
+    // target_client->messages_outgoing_.append(oss.str());
+    // server_.epoll_in_out(target_client->fd_);
+  }
+}
+
+
+
+
+void MessageHandler::command_MODE(Client& client, std::stringstream& message) {
+  std::string target;
+  if (!(message >> target)) {
+    reply_ERR_NEEDMOREPARAMS(client, "MODE");
+    return;
+  }
 
   // Check if the target is a channel or a user
   if (target[0] == '#' || target[0] == '&') {
     // Handle channel mode
-    handle_channel_mode(client, target, arguments);
+    handle_channel_mode(client, target, message);
   } else {
-    // // Handle user mode
-    // handle_user_mode(client, target, arguments);
+    // Handle user mode
+    // (client, target, message);
   }
 }
-
-void MessageHandler::handle_channel_mode(Client& client, const string& channel_name, vector<string>& arguments) {
+void MessageHandler::handle_channel_mode(Client& client, const std::string& channel_name, std::stringstream& message) {
   std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
   if (it == server_.channels_.end()) {
     // Channel does not exist
-    std::string message = "403 " + client.nick_ + " " + channel_name + " :No such channel\r\n";
-    client.messages_outgoing_.append(message);
+    std::ostringstream oss;
+    oss << "403 " << client.nick_ << " " << channel_name << " :No such channel\r\n";
+    client.messages_outgoing_.append(oss.str());
+    server_.epoll_in_out(client.fd_);
     return;
   }
 
   Channel* channel = it->second;
 
-  if (arguments.size() == 1) {
+  std::string mode_changes;
+  if (!(message >> mode_changes)) {
     // No mode changes, just return the current mode
-    std::string message = "324 " + client.nick_ + " " + channel_name + " \r\n"; // Simplified, should include actual modes
-    client.messages_outgoing_.append(message);
+    std::ostringstream oss;
+    oss << "324 " << client.nick_ << " " << channel_name << " \r\n"; // Simplified, should include actual modes
+    client.messages_outgoing_.append(oss.str());
     server_.epoll_in_out(client.fd_);
   } 
-  // else {
-  //   // Apply mode changes
-  //   std::string mode_changes = arguments[1];
-  //   std::string message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel_name + " " + mode_changes + "\r\n";
-  //   channel->broadcast(message);
-  // }
+  else {
+    // // Apply mode changes
+    // std::ostringstream oss;
+    // oss << ":" << client.nick_ << "!" << client.username_ << "@" << client.hostname_ << " MODE " << channel_name << " " << mode_changes << "\r\n";
+    // channel->broadcast(client.fd_, oss.str());
+  }
 }
-
 // void MessageHandler::handle_user_mode(Client& client, const std::string& target_nick, std::vector<std::string>& arguments) {
 //   std::map<int, Client*>::iterator it = server_.clients_.find(client.fd_);
 //   if (it == server.clients_.end() || it->second->nick_ != target_nick) {
