@@ -23,10 +23,10 @@ void Channel::join_message_to_all(Client& client) {
 void Channel::broadcast(int sender_fd, const std::string& message) {
   std::map<int, Client*>::const_iterator it = clients_.begin();
   for (; it != clients_.end(); ++it) {
-    if (it->first != sender_fd) { // Skip the sender
+    // if (it->first != sender_fd) { // Skip the sender
       it->second->messages_outgoing_.append(message);
       server_.epoll_in_out(it->first);
-    }
+    // }
   }
 }
 

@@ -119,9 +119,9 @@ void MessageHandler::command_NICK(Client& client, std::stringstream& message) {
 
 
 void MessageHandler::command_USER(Client& client, std::stringstream& message) {
-  std::string username, hostname, servername, realname;
+  std::string username, user_mode, hostname, realname;
 
-  if (!(message >> username >> hostname >> servername)) {
+  if (!(message >> username >> user_mode >> hostname)) {
     reply_ERR_NEEDMOREPARAMS(client, "USER");
     return;
   }
@@ -134,8 +134,7 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
   }
 
   client.username_ = username;
-  client.hostname_ = hostname;
-  client.servername_ = servername;
+  // client.hostname_ = hostname;
   client.realname_ = realname;
 
   std::ostringstream oss;
@@ -263,6 +262,7 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
 
     // Construct the PRIVMSG message
     std::ostringstream oss;
+    cout << "Hostname: " << sender.hostname_ << std::endl;
     oss << ":" << sender.nick_ << "!" << sender.username_ << "@" << sender.hostname_ << " PRIVMSG " << target << " :" << message_content << "\r\n";
 
     // Broadcast the message to the channel

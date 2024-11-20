@@ -22,14 +22,14 @@ public:
   std::string nick_;
   std::string username_;
   std::string hostname_;
-  std::string servername_;
+  // std::string servername_;
   std::string realname_;
   std::string messages_incoming_;
   std::string messages_outgoing_;
 
   std::map<std::string, Channel*> channels_;
 
-  Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len_);
+  Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len_, const std::string& hostname);
   ~Client();
 
   void add_buffer_to(const char* message);

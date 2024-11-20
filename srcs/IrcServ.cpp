@@ -5,6 +5,7 @@
 #include <fcntl.h>
 // #include <cstdlib>
 #include <signal.h>
+#include <netdb.h>
 
 #include "IrcServ.hpp"
 
@@ -226,6 +227,7 @@ void IrcServ::start() {
 
   if (bind(server_fd_, (sockaddr*)&server_addr_, sizeof(server_addr_)) == -1) {
     perror("Error. Failed binding on port");
+    cleanup();
     exit(EXIT_FAILURE);
   }
 
@@ -261,6 +263,21 @@ void IrcServ::event_loop() {
           }
         }
         set_non_block(client_fd);
+
+     // Get the client's IP address
+        // char* client_ip = inet_ntoa(client_addr.sin_addr);
+        // std::string client_hostname(client_ip);
+
+        // // Optionally, attempt to get the hostname
+        // struct hostent* host_entry = gethostbyaddr(&client_addr.sin_addr, sizeof(client_addr.sin_addr), AF_INET);
+        // if (host_entry && host_entry->h_name) {
+        //   client_hostname = host_entry->h_name;
+        // }
+        // cout << "Hostname: " << client_hostname << endl;
+
+        char* client_ip = inet_ntoa(client_addr.sin_addr);
+        std::string client_hostname(client_ip);
+
         epoll_event client_ev;
         client_ev.events = EPOLLIN; // Use level-triggered mode (default)
         client_ev.data.fd = client_fd;
@@ -269,7 +286,8 @@ void IrcServ::event_loop() {
           close(client_fd);
           continue;
         }
-        clients_[client_fd] = new Client(client_fd, client_addr, addr_len);
+        clients_[client_fd] = new Client(client_fd, client_addr, addr_len, client_hostname);
+        cout << "Hostname " << clients_[client_fd]->hostname_ << endl;
       }
       else if (events[i].events & EPOLLIN) { // event on client fd (incoming message)
         client_fd = events[i].data.fd;

@@ -6,14 +6,14 @@
 using std::string;
 using std::vector;
 
-Client::Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len)
+Client::Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len, const std::string& hostname)
   : fd_(fd),
     client_addr_(client_addr),
     client_addr_len_(client_addr_len),
     nick_(""),
     username_(""),
-    hostname_(""),
-    servername_(""),
+    hostname_(hostname),
+    // servername_(""),
     realname_(""),
     messages_incoming_("")
     {
