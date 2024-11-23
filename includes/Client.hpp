@@ -8,6 +8,12 @@
 #include <map>
 #include "Channel.hpp"
 
+enum ConnectionState {
+  WAITING_FOR_PASS,
+  WAITING_FOR_NICK,
+  WAITING_FOR_USER,
+  REGISTERED
+};
 
 class Channel;
 
@@ -26,6 +32,7 @@ public:
   std::string realname_;
   std::string messages_incoming_;
   std::string messages_outgoing_;
+  ConnectionState state_;
 
   std::map<std::string, Channel*> channels_;
 

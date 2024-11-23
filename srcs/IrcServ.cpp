@@ -196,7 +196,7 @@ void IrcServ::set_non_block(int sock_fd) {
 void IrcServ::initializeServerAddr() {
   memset(&server_addr_, 0, sizeof(server_addr_));
   server_addr_.sin_family = AF_INET;
-  server_addr_.sin_addr.s_addr = inet_addr("127.0.0.1"); // INADDR_ANY; Listen on all interfaces
+  server_addr_.sin_addr.s_addr = inet_addr("127.0.0.1"); //htonl(INADDR_ANY); // Listen on all interfaces
   server_addr_.sin_port = htons(static_cast<uint16_t>(port_));
 }
 
@@ -235,7 +235,19 @@ void IrcServ::start() {
     perror("Error. Failed to listen on socket");
     exit(EXIT_FAILURE);
   }
-  cout << "Server started on port " << port_ << endl;
+
+// Get the IP address on which the server is listening
+  sockaddr_in bound_addr;
+  socklen_t bound_addr_len = sizeof(bound_addr);
+  if (getsockname(server_fd_, (sockaddr*)&bound_addr, &bound_addr_len) == -1) {
+    perror("Error getting socket name");
+    cleanup();
+    exit(EXIT_FAILURE);
+  }
+  char* bound_ip = inet_ntoa(bound_addr.sin_addr);
+  cout << "Server started on IP " << bound_ip << " and port " << port_ << endl;
+
+  // cout << "Server started on port " << port_ << endl;
   event_loop();
 }
 
@@ -286,8 +298,15 @@ void IrcServ::event_loop() {
           close(client_fd);
           continue;
         }
-        clients_[client_fd] = new Client(client_fd, client_addr, addr_len, client_hostname);
-        cout << "Hostname " << clients_[client_fd]->hostname_ << endl;
+        Client* client = new Client(client_fd, client_addr, addr_len, client_hostname); // add malloc check
+        clients_[client_fd] = client;
+        if (password_.empty()) {
+          client->state_ = WAITING_FOR_NICK;
+        }
+        else {
+          client->state_ = WAITING_FOR_PASS;
+        }
+        cout << "Hostname " << client->hostname_ << endl;
       }
       else if (events[i].events & EPOLLIN) { // event on client fd (incoming message)
         client_fd = events[i].data.fd;

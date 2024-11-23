@@ -10,13 +10,7 @@ Client::Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len, con
   : fd_(fd),
     client_addr_(client_addr),
     client_addr_len_(client_addr_len),
-    nick_(""),
-    username_(""),
-    hostname_(hostname),
-    // servername_(""),
-    realname_(""),
-    messages_incoming_("")
-    {
+    hostname_(hostname) {
 }
 
 Client::~Client() {

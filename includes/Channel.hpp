@@ -32,7 +32,7 @@ public:
 
   void join_message_to_all(Client& client);
   void broadcast(int sender_fd, const std::string& message);
-  std::deque<std::pair<int, std::string> > get_users();
+  // std::deque<std::pair<int, std::string> > get_users();
 
 };
 

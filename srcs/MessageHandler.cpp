@@ -326,7 +326,7 @@ void MessageHandler::handle_channel_mode(Client& client, const std::string& chan
   if (!(message >> mode_changes)) {
     // No mode changes, just return the current mode
     std::ostringstream oss;
-    oss << "324 " << client.nick_ << " " << channel_name << " \r\n"; // Simplified, should include actual modes
+    oss << "324 " << client.nick_ << " " << channel_name << " +\r\n"; // Simplified, should include actual modes
     client.messages_outgoing_.append(oss.str());
     server_.epoll_in_out(client.fd_);
   } 
