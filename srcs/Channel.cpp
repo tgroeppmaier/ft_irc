@@ -15,7 +15,8 @@ void Channel::join_message_to_all(Client& client) {
   string join_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " JOIN " + name_ + "\r\n";
   map<int, Client*>::const_iterator it = clients_.begin();
   for (; it != clients_.end(); ++it) {
-    it->second->messages_outgoing_.append(join_message);
+    (*it).second->add_message_out(join_message);
+    // it->second->messages_outgoing_.append(join_message);
     server_.epoll_in_out(it->first);
   }
 }

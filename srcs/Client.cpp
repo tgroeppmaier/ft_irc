@@ -42,6 +42,9 @@ void Client::remove_from_all_channels() {
   for (it = channels_.begin(); it != channels_.end(); ++it) {
     (*it).second->remove_client(*this);
   }
-
-
 }
+
+void Client::add_channel(const string& name, Channel* channel) {
+  channels_[name] = channel;
+}
+

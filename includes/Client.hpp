@@ -19,6 +19,7 @@ class Channel;
 
 class Client {
 private:
+  std::map<std::string, Channel*> channels_;
 
 public:
   int fd_;
@@ -34,7 +35,6 @@ public:
   std::string messages_outgoing_;
   ConnectionState state_;
 
-  std::map<std::string, Channel*> channels_;
 
   Client(int fd, sockaddr_in& client_addr, socklen_t& client_addr_len_, const std::string& hostname);
   ~Client();
@@ -43,6 +43,7 @@ public:
   void add_message_out(const std::string message);
   void message_to_all_channels(int sender_fd, const std::string& message);
   void remove_from_all_channels();
+  void add_channel(const std::string& name, Channel* channel);
 
 };
 
