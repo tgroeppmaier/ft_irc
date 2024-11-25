@@ -16,15 +16,13 @@ class Client;
 class MessageHandler {
 private:
   IrcServ& server_;
-  // void process_messages(Client& client, const std::string& message);
+  // Map of command strings to function pointers
+  std::map<std::string, void(MessageHandler::*)(Client&, std::stringstream&)> command_map_;
 
-public:
-  MessageHandler(IrcServ& server);
-  ~MessageHandler();
+  void client_not_registered(Client& client);
+  void handle_channel_mode(Client& client, const std::string& channel_name, std::stringstream& message);
+  // void handle_user_mode(Client& client, const std::string& target_nick, std::vector<std::string>& arguments);
 
-  void process_incoming_messages(Client& client);
-
-  void send_messages(Client& client);
   // Command handling functions
   void command_CAP(Client& client, std::stringstream& message);
   void command_NICK(Client& client, std::stringstream& message);
@@ -34,18 +32,16 @@ public:
   void command_JOIN(Client& client, std::stringstream& message);
   void command_MODE(Client& client, std::stringstream& message);
   void command_PRIVMSG(Client& client, std::stringstream& message);
+  void command_PASS(Client& client, std::stringstream& message);
 
   void reply_ERR_NEEDMOREPARAMS(Client& client, const std::string& command);
 
-  void handle_channel_mode(Client& client, const std::string& channel_name, std::stringstream& message);
-  // void handle_user_mode(Client& client, const std::string& target_nick, std::vector<std::string>& arguments);
+public:
+  MessageHandler(IrcServ& server);
+  ~MessageHandler();
 
-
-
-
-  // Map of command strings to function pointers
-  std::map<std::string, void(MessageHandler::*)(Client&, std::stringstream&)> command_map_;
-
+  void process_incoming_messages(Client& client);
+  void send_messages(Client& client);
 
 };
 

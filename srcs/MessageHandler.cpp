@@ -23,19 +23,12 @@ MessageHandler::MessageHandler(IrcServ& server) : server_(server) {
   command_map_["JOIN"] = &MessageHandler::command_JOIN;
   command_map_["MODE"] = &MessageHandler::command_MODE;
   command_map_["PRIVMSG"] = &MessageHandler::command_PRIVMSG;
+  command_map_["PASS"] = &MessageHandler::command_PASS;
 }
 
 MessageHandler::~MessageHandler() {
   command_map_.clear();
 }
-
-// void print_args(Client& client, vector<string>& arguments) {
-//   for(vector<string>::iterator it = arguments.begin(); it != arguments.end(); ++it) {
-//     cout << *it << ' ';
-//   }
-//   cout << endl;
-// }
-
 
 void MessageHandler::send_messages(Client& client) {
   size_t length = client.messages_outgoing_.length();
@@ -98,15 +91,32 @@ void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, const string& comm
   if (!command.empty()) {
     string message  = "461 " + client.nick_ + " " + command + " :Not enough parameters\r\n";
     client.messages_outgoing_.append(message);
-    server_.epoll_in_out(client.fd_);
+    // server_.epoll_in_out(client.fd_);
   }
 }
 
+void MessageHandler::client_not_registered(Client& client) {
+  std::ostringstream oss;
+  oss << "451 * :You have not registered\r\n";
+  client.messages_outgoing_.append(oss.str());
+  // cout << oss.str() << std::endl;
+  server_.add_to_close(&client);
+}
+
 void MessageHandler::command_CAP(Client& client, std::stringstream& message) {
+  if (client.state_ != WAITING_FOR_NICK) {
+    client_not_registered(client);
+    return;
+  }
   std::cout << "Handling CAP command for client " << client.fd_ << std::endl;
 }
 
 void MessageHandler::command_NICK(Client& client, std::stringstream& message) {
+  if (client.state_ != WAITING_FOR_NICK && client.state_ != REGISTERED) {
+    client_not_registered(client);
+    return;
+  }
+
   string nick;
   if (message >> nick) {
     client.nick_ = nick;
@@ -114,11 +124,26 @@ void MessageHandler::command_NICK(Client& client, std::stringstream& message) {
   else {
     reply_ERR_NEEDMOREPARAMS(client, "NICK");
   }
+  if (client.state_ == WAITING_FOR_NICK) {
+    client.state_ = WAITING_FOR_USER;
+  }
+
   std::cout << "Handling NICK command for client " << client.nick_<< std::endl;
 }
 
 
 void MessageHandler::command_USER(Client& client, std::stringstream& message) {
+  if (client.state_ == REGISTERED) {
+    string reply = "462 " + client.nick_ + " :You may not reregister\r\n";
+    client.messages_outgoing_.append(reply);
+    return;
+  }
+  
+  if (client.state_ != WAITING_FOR_USER) {
+    client_not_registered(client);
+    return;
+  }
+  
   std::string username, user_mode, hostname, realname;
 
   if (!(message >> username >> user_mode >> hostname)) {
@@ -132,37 +157,43 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
     reply_ERR_NEEDMOREPARAMS(client, "USER");
     return;
   }
+  if (client.state_ == WAITING_FOR_USER) {
+    client.state_ = REGISTERED;
+    cout << "State after User: " << client.state_ << std::endl;
+  }
+
 
   client.username_ = username;
   // client.hostname_ = hostname;
   client.realname_ = realname;
 
-  std::ostringstream oss;
+  std::string reply;
+  reply.reserve(128);
 
-  oss << "001 " << client.nick_ << " :Welcome to the IRC server\r\n";
-  client.messages_outgoing_.append(oss.str());
-  oss.str(""); // Clear the stream
+  reply = "001 " + client.nick_ + " :Welcome to the IRC server\r\n";
+  client.messages_outgoing_.append(reply);
 
-  oss << "002 " << client.nick_ << " :Your host is " << inet_ntoa(server_.server_addr_.sin_addr) << ", running version 1.0\r\n";
-  client.messages_outgoing_.append(oss.str());
-  oss.str(""); // Clear the stream
+  reply = "002 " + client.nick_ + " :Your host is " + inet_ntoa(server_.server_addr_.sin_addr) + ", running version 1.0\r\n";
+  client.messages_outgoing_.append(reply);
 
-  oss << "003 " << client.nick_ << " :This server was created today\r\n";
-  client.messages_outgoing_.append(oss.str());
-  oss.str(""); // Clear the stream
+  reply = "003 " + client.nick_ + " :This server was created today\r\n";
+  client.messages_outgoing_.append(reply);
 
-  oss << "004 " << client.nick_ << " " << inet_ntoa(server_.server_addr_.sin_addr) << " 1.0 o o\r\n";
-  client.messages_outgoing_.append(oss.str());
-  oss.str(""); // Clear the stream
+  reply = "004 " + client.nick_ + " " + inet_ntoa(server_.server_addr_.sin_addr) + " 1.0 o o\r\n";
+  client.messages_outgoing_.append(reply);
 
-  oss << "005 " << client.nick_ << " :Some additional information\r\n";
-  client.messages_outgoing_.append(oss.str());
+  reply = "005 " + client.nick_ + " :Some additional information\r\n";
+  client.messages_outgoing_.append(reply);
 
   std::cout << "Handling USER command for client " << client.username_ << std::endl;
 }
 
 
 void MessageHandler::command_PING(Client& client, std::stringstream& message) {
+  if (client.state_ != REGISTERED) {
+    client_not_registered(client);
+    return;
+  }
   string target;
   if (message >> target) {
     string reply = "PONG \r\n";
@@ -173,12 +204,24 @@ void MessageHandler::command_PING(Client& client, std::stringstream& message) {
   }
 }
 
-void MessageHandler::command_QUIT(Client& client, std::stringstream& arguments) {
-  cout << "closing fd: " << client.fd_ << std::endl;
+void MessageHandler::command_QUIT(Client& client, std::stringstream& message) {
+  std::string quit_message;
+  std::getline(message >> std::ws, quit_message); // skip initial whitespace
+
+  if (!quit_message.empty() && quit_message[0] == ':') {
+    quit_message.erase(0, 1);
+  }
+
+  std::string broadcast_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " QUIT :" + quit_message + "\r\n";
+  client.message_to_all_channels(client.fd_, broadcast_message);
   server_.delete_client(client.fd_);
 }
 
 void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
+  if (client.state_ != REGISTERED) {
+    client_not_registered(client);
+    return;
+  }
   std::string channels_str;
   std::string keys_str;
 
@@ -214,7 +257,7 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
       // Invalid channel name, send error message
       std::string error_message = "403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
       client.messages_outgoing_.append(error_message);
-      server_.epoll_in_out(client.fd_);
+      // server_.epoll_in_out(client.fd_);
       continue;
     }
 
@@ -228,6 +271,10 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
 }
 
 void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message) {
+  if (sender.state_ != REGISTERED) {
+    client_not_registered(sender);
+    return;
+  }
   std::string target;
   if (!(message >> target)) {
     reply_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
@@ -256,7 +303,7 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
       std::ostringstream oss;
       oss << "403 " << sender.nick_ << " " << target << " :No such channel\r\n";
       sender.messages_outgoing_.append(oss.str());
-      server_.epoll_in_out(sender.fd_);
+      // server_.epoll_in_out(sender.fd_);
       return;
     }
 
@@ -294,6 +341,10 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
 
 
 void MessageHandler::command_MODE(Client& client, std::stringstream& message) {
+  if (client.state_ != REGISTERED) {
+    client_not_registered(client);
+    return;
+  }
   std::string target;
   if (!(message >> target)) {
     reply_ERR_NEEDMOREPARAMS(client, "MODE");
@@ -309,6 +360,7 @@ void MessageHandler::command_MODE(Client& client, std::stringstream& message) {
     // (client, target, message);
   }
 }
+
 void MessageHandler::handle_channel_mode(Client& client, const std::string& channel_name, std::stringstream& message) {
   std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
   if (it == server_.channels_.end()) {
@@ -316,7 +368,7 @@ void MessageHandler::handle_channel_mode(Client& client, const std::string& chan
     std::ostringstream oss;
     oss << "403 " << client.nick_ << " " << channel_name << " :No such channel\r\n";
     client.messages_outgoing_.append(oss.str());
-    server_.epoll_in_out(client.fd_);
+    // server_.epoll_in_out(client.fd_);
     return;
   }
 
@@ -328,12 +380,12 @@ void MessageHandler::handle_channel_mode(Client& client, const std::string& chan
     std::ostringstream oss;
     oss << "324 " << client.nick_ << " " << channel_name << " +\r\n"; // Simplified, should include actual modes
     client.messages_outgoing_.append(oss.str());
-    server_.epoll_in_out(client.fd_);
+    // server_.epoll_in_out(client.fd_);
   } 
   else {
     // // Apply mode changes
     // std::ostringstream oss;
-    // oss << ":" << client.nick_ << "!" << client.username_ << "@" << client.hostname_ << " MODE " << channel_name << " " << mode_changes << "\r\n";
+    // oss << ":" << client.nick_ << "!" << client.username_ << "@" << client.hostnamevoid MessageHandler::command_PASSWD(Client& client, std::stringstream& message) {
     // channel->broadcast(client.fd_, oss.str());
   }
 }
@@ -358,3 +410,26 @@ void MessageHandler::handle_channel_mode(Client& client, const std::string& chan
 //     client.messages_outgoing_.append(message);
 //   }
 // }
+
+
+void MessageHandler::command_PASS(Client& client, std::stringstream& message) {
+  if (client.state_ != WAITING_FOR_PASS) {
+    return;
+  }
+
+  std::string password;
+  if (!(message >> password)) {
+    reply_ERR_NEEDMOREPARAMS(client, "PASS");
+    client_not_registered(client);
+    return;
+  }
+  if (server_.password_ == password) {
+    client.state_ = WAITING_FOR_NICK;
+  } 
+  else {
+    std::string error_message = "464 * :Password incorrect\r\n";
+    client.messages_outgoing_.append(error_message);
+    client_not_registered(client);
+    // server_.epoll_in_out(client.fd_);
+  }
+}

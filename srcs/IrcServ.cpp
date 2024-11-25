@@ -32,8 +32,8 @@ IrcServ::IrcServ(int port) :
 IrcServ::IrcServ(int port, string password) :
   port_(port), 
   server_fd_(0),
-  password_(password),
   ep_fd_(0),
+  password_(password),
   server_addr_(),
   clients_(),
   message_handler_(new MessageHandler(*this)) {
@@ -54,6 +54,23 @@ void IrcServ::epoll_in_out(int client_fd) {
   }
   // cout << "Client fd " << client_fd << " modified to in out Events" << endl;
 }
+
+void IrcServ::add_to_close(Client* client) {
+  clients_to_close.insert(client);
+}
+
+void IrcServ::cleanup_clients() {
+  if (clients_to_close.empty()) {
+    return;
+  }
+  std::set<Client*>::iterator it = clients_to_close.begin();
+  for (; it != clients_to_close.end(); ++it) {
+    delete_client((*it)->fd_);
+  }
+  clients_to_close.clear();
+  
+}
+
 
 
 void IrcServ::join_channel(const std::string& name, Client& client) {
@@ -132,6 +149,7 @@ void IrcServ::delete_client(int client_fd) {
   if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
     perror("Error removing client socket from epoll");
   }
+  
   delete clients_[client_fd];
   clients_.erase(client_fd);
 }
@@ -247,7 +265,21 @@ void IrcServ::start() {
   char* bound_ip = inet_ntoa(bound_addr.sin_addr);
   cout << "Server started on IP " << bound_ip << " and port " << port_ << endl;
 
-  // cout << "Server started on port " << port_ << endl;
+  //  // Perform reverse DNS lookup to get the hostname
+  // {
+  //   struct hostent* he;
+  //   he = gethostbyaddr((const void*)&bound_addr.sin_addr, sizeof(bound_addr.sin_addr), AF_INET);
+  //   if (he == NULL) {
+  //     perror("Error. Failed to resolve IP address to hostname");
+  //     cleanup();
+  //     exit(EXIT_FAILURE);
+  //   }
+
+  //   // Set the hostname
+  //   hostname_ = he->h_name;
+  // }
+  // cout << "Server hostname: " << hostname_ << endl;
+
   event_loop();
 }
 
@@ -306,7 +338,8 @@ void IrcServ::event_loop() {
         else {
           client->state_ = WAITING_FOR_PASS;
         }
-        cout << "Hostname " << client->hostname_ << endl;
+        cout << "Client Hostname " << client->hostname_ << endl;
+        cout << "Client State " << client->state_ << endl;
       }
       else if (events[i].events & EPOLLIN) { // event on client fd (incoming message)
         client_fd = events[i].data.fd;
@@ -333,6 +366,7 @@ void IrcServ::event_loop() {
         client_fd = events[i].data.fd;
         Client* client = clients_[client_fd];
         message_handler_->send_messages(*client);
+        cleanup_clients();
       }
     }
   }

@@ -21,13 +21,15 @@ int main(int argc, char* argv[]) {
     return 1;
   }
 
-  // Extract the password
-  // string password = argv[2];
-
-  IrcServ server(port);
-  // MessageHandler* message_handler= new MessageHandler(server);
-  // server.message_handler_ = message_handler;
-  server.start();
+  if (argv[2]) {
+    string password = argv[2];
+    IrcServ server(port, password);
+    server.start();
+  } 
+  else {
+    IrcServ server(port);
+    server.start();
+  }
 
   return 0;
 }

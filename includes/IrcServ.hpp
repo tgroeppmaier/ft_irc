@@ -2,6 +2,7 @@
 #define IRCSERV_HPP
 
 #include <map>
+#include <set>
 #include <queue>
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -22,30 +23,34 @@ class IrcServ {
 private:
   int port_;
   int server_fd_;
-  std::string password_;
   static IrcServ* instance_;
   
 
   static void signal_handler(int signal);
   static void set_non_block(int sock_fd);
+  void cleanup_clients();
 
   void initializeServerAddr();
   void register_signal_handlers();
   void event_loop();
+  std::set<Client*> clients_to_close;
 
 
 public:
   int ep_fd_;
+  std::string password_;
+  std::string hostname_;
   sockaddr_in server_addr_;
   std::map<int, Client*> clients_;
   std::map<std::string, Channel*> channels_;
   MessageHandler* message_handler_;
 
   IrcServ(int port);
-  ~IrcServ();
   IrcServ(int port, std::string password);
+  ~IrcServ();
   void close_socket(int fd);
   void delete_client(int fd);
+  void add_to_close(Client* client);
 
   void create_channel(const std::string& name, Client& admin);
   void join_channel(const std::string& name, Client& admin);

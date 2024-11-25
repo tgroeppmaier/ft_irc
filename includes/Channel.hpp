@@ -32,6 +32,7 @@ public:
 
   void join_message_to_all(Client& client);
   void broadcast(int sender_fd, const std::string& message);
+  void remove_client(Client& client);
   // std::deque<std::pair<int, std::string> > get_users();
 
 };
