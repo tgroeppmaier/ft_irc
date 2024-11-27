@@ -17,9 +17,10 @@ class IrcServ;
 class Channel {
 private:
   IrcServ& server_;
-  std::string password_;
   int user_limit_;
+  int user_count_;
   std::string name_;
+  std::string password_;
 
 
 public:

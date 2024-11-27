@@ -27,10 +27,11 @@ private:
   
 
   static void signal_handler(int signal);
-  static void set_non_block(int sock_fd);
+  void set_non_block(int sock_fd);
   void cleanup_clients();
 
   void initializeServerAddr();
+  bool add_fd_to_epoll(int fd);
   void register_signal_handlers();
   void event_loop();
   std::set<Client*> clients_to_close;

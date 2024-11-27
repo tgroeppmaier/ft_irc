@@ -114,7 +114,6 @@ Channel* IrcServ::get_channel(const std::string& name) {
 void IrcServ::create_channel(const std::string& name, Client& admin) {
   Channel* channel = new Channel(*this, name, admin);
   channels_[name] = channel;
-  // admin.channels_[name] = channel;
   admin.add_channel(name, channel);
 
   // Create and send JOIN message
@@ -224,6 +223,18 @@ void IrcServ::initializeServerAddr() {
   server_addr_.sin_port = htons(static_cast<uint16_t>(port_));
 }
 
+bool IrcServ::add_fd_to_epoll(int fd) {
+  epoll_event ev;
+  ev.events = EPOLLIN;
+  ev.data.fd = fd;
+  if (epoll_ctl(ep_fd_, EPOLL_CTL_ADD, fd, &ev) == -1) {
+    perror("Error adding server socket to epoll");
+    return false;
+    // exit(EXIT_FAILURE);
+  }
+  return true;
+}
+
 void IrcServ::start() {
   register_signal_handlers();
   server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
@@ -240,11 +251,7 @@ void IrcServ::start() {
     exit(EXIT_FAILURE);
   }
 
-  // add server socket to epoll
-  epoll_event ev;
-  ev.events = EPOLLIN;
-  ev.data.fd = server_fd_;
-  if (epoll_ctl(ep_fd_, EPOLL_CTL_ADD, server_fd_, &ev) == -1) {
+  if(!add_fd_to_epoll(server_fd_)) {
     perror("Error adding server socket to epoll");
     exit(EXIT_FAILURE);
   }
@@ -314,7 +321,7 @@ void IrcServ::event_loop() {
         }
         set_non_block(client_fd);
 
-     // Get the client's IP address
+        // Get the client's IP address
         // char* client_ip = inet_ntoa(client_addr.sin_addr);
         // std::string client_hostname(client_ip);
 
@@ -328,10 +335,8 @@ void IrcServ::event_loop() {
         char* client_ip = inet_ntoa(client_addr.sin_addr);
         std::string client_hostname(client_ip);
 
-        epoll_event client_ev;
-        client_ev.events = EPOLLIN; // Use level-triggered mode (default)
-        client_ev.data.fd = client_fd;
-        if (epoll_ctl(ep_fd_, EPOLL_CTL_ADD, client_fd, &client_ev) == -1) {
+
+        if (!add_fd_to_epoll(client_fd)) {
           perror("Error adding client socket to epoll");
           close(client_fd);
           continue;
@@ -344,8 +349,14 @@ void IrcServ::event_loop() {
         else {
           client->state_ = WAITING_FOR_PASS;
         }
-        cout << "Client Hostname " << client->hostname_ << endl;
-        cout << "Client State " << client->state_ << endl;
+        // cout << "Client Hostname " << client->hostname_ << endl;
+        // cout << "Client State " << client->state_ << endl;
+      }
+      else if (events[i].events & EPOLLOUT) { // fd is ready to send messages
+        client_fd = events[i].data.fd;
+        Client* client = clients_[client_fd];
+        message_handler_->send_messages(*client);
+        cleanup_clients();
       }
       else if (events[i].events & EPOLLIN) { // event on client fd (incoming message)
         client_fd = events[i].data.fd;
@@ -355,7 +366,7 @@ void IrcServ::event_loop() {
         if ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
-          cout << "\033[31m" << buffer << "\033[0m" << endl; // debug purposes       
+          // cout << "\033[31m" << buffer << "\033[0m" << endl; // debug purposes       
           message_handler_->process_incoming_messages(*client);
         } 
         else if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {
@@ -367,12 +378,6 @@ void IrcServ::event_loop() {
           }
           delete_client(client_fd);
         }
-      }
-      else if (events[i].events & EPOLLOUT) { // fd is ready to send messages
-        client_fd = events[i].data.fd;
-        Client* client = clients_[client_fd];
-        message_handler_->send_messages(*client);
-        cleanup_clients();
       }
     }
   }

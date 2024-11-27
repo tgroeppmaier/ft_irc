@@ -10,3 +10,6 @@ vgcore.*
 .tests/
 tests/MessageHandlerTest.cpp
 tests/test_messagehandler.cpp
+callgrind.out.*
+perf.data
+flamegraph.svg

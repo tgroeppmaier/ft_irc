@@ -78,7 +78,8 @@ void MessageHandler::process_incoming_messages(Client& client) {
           return;
     } else {
       message  = "421 " + client.nick_ + " " + command + " :Unknown command\r\n";
-      client.messages_outgoing_.append(message);
+      client.add_message_out(message);
+      // client.messages_outgoing_.append(message);
       std::cout << "Unknown command: " << command << std::endl;
     }
   }
@@ -90,20 +91,23 @@ void MessageHandler::process_incoming_messages(Client& client) {
 void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, const string& command) {
   if (!command.empty()) {
     string message  = "461 " + client.nick_ + " " + command + " :Not enough parameters\r\n";
-    client.messages_outgoing_.append(message);
+    client.add_message_out(message);
+
+    // client.messages_outgoing_.append(message);
     // server_.epoll_in_out(client.fd_);
   }
 }
 
 void MessageHandler::client_not_registered(Client& client) {
-  std::ostringstream oss;
-  oss << "451 * :You have not registered\r\n";
-  client.messages_outgoing_.append(oss.str());
+  string message = "451 * :You have not registered\r\n";
+  client.add_message_out(message);
+
+  // client.messages_outgoing_.append(oss.str());
   // cout << oss.str() << std::endl;
   server_.add_to_close(&client);
 }
 
-void MessageHandler::command_CAP(Client& client, std::stringstream& message) {
+void MessageHandler::command_CAP(Client& client, std::stringstream& /* message */) {
   if (client.state_ != WAITING_FOR_NICK) {
     client_not_registered(client);
     return;
@@ -135,7 +139,9 @@ void MessageHandler::command_NICK(Client& client, std::stringstream& message) {
 void MessageHandler::command_USER(Client& client, std::stringstream& message) {
   if (client.state_ == REGISTERED) {
     string reply = "462 " + client.nick_ + " :You may not reregister\r\n";
-    client.messages_outgoing_.append(reply);
+    client.add_message_out(reply);
+    
+    // client.messages_outgoing_.append(reply);
     return;
   }
   
@@ -171,19 +177,21 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
   reply.reserve(128);
 
   reply = "001 " + client.nick_ + " :Welcome to the IRC server\r\n";
-  client.messages_outgoing_.append(reply);
+  client.add_message_out(reply);
+
 
   reply = "002 " + client.nick_ + " :Your host is " + inet_ntoa(server_.server_addr_.sin_addr) + ", running version 1.0\r\n";
-  client.messages_outgoing_.append(reply);
+  client.add_message_out(reply);
+  
 
   reply = "003 " + client.nick_ + " :This server was created today\r\n";
-  client.messages_outgoing_.append(reply);
+  client.add_message_out(reply);
 
   reply = "004 " + client.nick_ + " " + inet_ntoa(server_.server_addr_.sin_addr) + " 1.0 o o\r\n";
-  client.messages_outgoing_.append(reply);
+  client.add_message_out(reply);
 
   reply = "005 " + client.nick_ + " :Some additional information\r\n";
-  client.messages_outgoing_.append(reply);
+  client.add_message_out(reply);
 
   std::cout << "Handling USER command for client " << client.username_ << std::endl;
 }
@@ -197,7 +205,7 @@ void MessageHandler::command_PING(Client& client, std::stringstream& message) {
   string target;
   if (message >> target) {
     string reply = "PONG \r\n";
-    client.messages_outgoing_.append(reply);
+    client.add_message_out(reply);
   }
   else {
     reply_ERR_NEEDMOREPARAMS(client, "PING");
@@ -256,7 +264,9 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
     if (channel_name[0] != '#' && channel_name[0] != '&') {
       // Invalid channel name, send error message
       std::string error_message = "403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
-      client.messages_outgoing_.append(error_message);
+      client.add_message_out(error_message);
+
+      // client.messages_outgoing_.append(error_message);
       // server_.epoll_in_out(client.fd_);
       continue;
     }
@@ -302,19 +312,21 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
     if (channel == NULL) {
       std::ostringstream oss;
       oss << "403 " << sender.nick_ << " " << target << " :No such channel\r\n";
-      sender.messages_outgoing_.append(oss.str());
+      sender.add_message_out(oss.str());
+
+      // sender.messages_outgoing_.append(oss.str());
       // server_.epoll_in_out(sender.fd_);
       return;
     }
 
     // Construct the PRIVMSG message
     std::ostringstream oss;
-    cout << "Hostname: " << sender.hostname_ << std::endl;
+    // cout << "Hostname: " << sender.hostname_ << std::endl;
     oss << ":" << sender.nick_ << "!" << sender.username_ << "@" << sender.hostname_ << " PRIVMSG " << target << " :" << message_content << "\r\n";
 
     // Broadcast the message to the channel
     channel->broadcast(sender.fd_, oss.str());
-    std::cout << "Broadcast: " << oss.str() << std::endl;
+    // std::cout << "Broadcast: " << oss.str() << std::endl;
 
   } else {
     // Handle sending message to a user
@@ -367,8 +379,7 @@ void MessageHandler::handle_channel_mode(Client& client, const std::string& chan
     // Channel does not exist
     std::ostringstream oss;
     oss << "403 " << client.nick_ << " " << channel_name << " :No such channel\r\n";
-    client.messages_outgoing_.append(oss.str());
-    // server_.epoll_in_out(client.fd_);
+    client.add_message_out(oss.str());
     return;
   }
 
@@ -379,8 +390,7 @@ void MessageHandler::handle_channel_mode(Client& client, const std::string& chan
     // No mode changes, just return the current mode
     std::ostringstream oss;
     oss << "324 " << client.nick_ << " " << channel_name << " +\r\n"; // Simplified, should include actual modes
-    client.messages_outgoing_.append(oss.str());
-    // server_.epoll_in_out(client.fd_);
+    client.add_message_out(oss.str());
   } 
   else {
     // // Apply mode changes
