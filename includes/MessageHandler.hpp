@@ -6,6 +6,8 @@
 #include <map>
 #include "Client.hpp"
 #include "IrcServ.hpp"
+#include <sstream>
+
 
 
 
@@ -21,6 +23,10 @@ private:
 
   void client_not_registered(Client& client);
   void handle_channel_mode(Client& client, const std::string& channel_name, std::stringstream& message);
+  std::string create_message(Client& client, const std::string& command, const std::string& parameters, const std::string& message);
+  std::string extract_message(std::stringstream& message);
+  
+  
   // void handle_user_mode(Client& client, const std::string& target_nick, std::vector<std::string>& arguments);
 
   // Command handling functions
@@ -33,8 +39,11 @@ private:
   void command_MODE(Client& client, std::stringstream& message);
   void command_PRIVMSG(Client& client, std::stringstream& message);
   void command_PASS(Client& client, std::stringstream& message);
+  void command_KICK(Client& client, std::stringstream& message);
 
   void reply_ERR_NEEDMOREPARAMS(Client& client, const std::string& command);
+  void reply_ERR_USERNOTINCHANNEL(Client& client, const std::string& nick, const std::string& channel);
+  void reply_ERR_NOSUCHCHANNEL(Client& client, const std::string& channel);
 
 public:
   MessageHandler(IrcServ& server);

@@ -111,6 +111,17 @@ Channel* IrcServ::get_channel(const std::string& name) {
 }
 
 
+// Client* IrcServ::get_client(const std::string& name) {
+//   map<int, Client*>::const_iterator it = clients_.begin();
+//   if ((*it).second->nick_ == name) {
+//     return NULL;
+//   }
+//   return it->second;
+// }
+
+
+
+
 void IrcServ::create_channel(const std::string& name, Client& admin) {
   Channel* channel = new Channel(*this, name, admin);
   channels_[name] = channel;
@@ -366,7 +377,7 @@ void IrcServ::event_loop() {
         if ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
-          // cout << "\033[31m" << buffer << "\033[0m" << endl; // debug purposes       
+          cout << "\033[31m" << buffer << "\033[0m" << endl; // debug purposes       
           message_handler_->process_incoming_messages(*client);
         } 
         else if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {

@@ -18,6 +18,8 @@ Client::~Client() {
     close(fd_);
   }
   remove_from_all_channels();
+  // messages_incoming_.clear();
+  // messages_outgoing_.clear();
 }
 
 void Client::add_buffer_to(const char* message) {

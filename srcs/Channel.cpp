@@ -39,6 +39,30 @@ void Channel::remove_client(Client& client) {
   }
 }
 
+void Channel::kick_client(Client& client, const std::string&message) {
+
+}
+
+bool Channel::is_operator(int fd) {
+  if (admins_.find(fd) == admins_.end()) {
+    return false;
+  }
+  return true;
+}
+
+Client* Channel::get_client(const std::string& name) {
+  map<int, Client*>::const_iterator it = clients_.begin();
+  if ((*it).second->nick_ == name) {
+    return (*it).second;
+  }
+  return NULL;
+}
+
+
+
+
+
+
 
 // std::deque<std::pair<int, std::string> > Channel::get_users() {
 

@@ -1,6 +1,5 @@
 #include "MessageHandler.hpp"
 #include <iostream>
-#include <sstream>
 #include <cstdio>
 #include <sys/epoll.h>
 #include <string>
@@ -24,6 +23,7 @@ MessageHandler::MessageHandler(IrcServ& server) : server_(server) {
   command_map_["MODE"] = &MessageHandler::command_MODE;
   command_map_["PRIVMSG"] = &MessageHandler::command_PRIVMSG;
   command_map_["PASS"] = &MessageHandler::command_PASS;
+  command_map_["KICK"] = &MessageHandler::command_KICK;
 }
 
 MessageHandler::~MessageHandler() {
@@ -33,9 +33,9 @@ MessageHandler::~MessageHandler() {
 void MessageHandler::send_messages(Client& client) {
   size_t length = client.messages_outgoing_.length();
   ssize_t bytes_sent = send(client.fd_, client.messages_outgoing_.c_str(), length, MSG_NOSIGNAL);
-  // if (bytes_sent > 0) {
-  //   cout << client.messages_outgoing_.substr(0, static_cast<size_t>(bytes_sent)) << std::endl; // DEBUG
-  // }
+  if (bytes_sent > 0) {
+    cout << client.messages_outgoing_.substr(0, static_cast<size_t>(bytes_sent)) << std::endl; // DEBUG
+  }
   if (bytes_sent == static_cast<ssize_t>(length)) { // all messages have been sent
     client.messages_outgoing_.clear();
     epoll_event ev;
@@ -92,11 +92,28 @@ void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, const string& comm
   if (!command.empty()) {
     string message  = "461 " + client.nick_ + " " + command + " :Not enough parameters\r\n";
     client.add_message_out(message);
-
-    // client.messages_outgoing_.append(message);
-    // server_.epoll_in_out(client.fd_);
   }
 }
+
+#include <arpa/inet.h> // For inet_ntoa
+
+void MessageHandler::reply_ERR_USERNOTINCHANNEL(Client& client, const string& target_nick, const string& channel) {
+  string message = "441 " + target_nick + " " + channel + " :They aren't on that channel\r\n";
+  client.add_message_out(message);
+}
+
+void MessageHandler::reply_ERR_NOSUCHCHANNEL(Client& client, const string& channel_name) {
+  // std::string server_address = inet_ntoa(server_.server_addr_.sin_addr);
+  // std::string error_message = ":" + server_address + " 403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
+  std::string error_message = "403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
+  client.add_message_out(error_message);
+}
+
+string MessageHandler::create_message(Client& client, const string& command, const string& parameters, const string& message_content) {
+  string message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " " + command + " " + parameters + " :" + message_content + "\r\n";
+  return message;
+}
+
 
 void MessageHandler::client_not_registered(Client& client) {
   string message = "451 * :You have not registered\r\n";
@@ -262,12 +279,7 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
   for (size_t i = 0; i < channels.size(); ++i) {
     std::string channel_name = channels[i];
     if (channel_name[0] != '#' && channel_name[0] != '&') {
-      // Invalid channel name, send error message
-      std::string error_message = "403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
-      client.add_message_out(error_message);
-
-      // client.messages_outgoing_.append(error_message);
-      // server_.epoll_in_out(client.fd_);
+      reply_ERR_NOSUCHCHANNEL(client, channel_name);
       continue;
     }
 
@@ -290,7 +302,6 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
     reply_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
     return;
   }
-
   // Extract the remaining message content from the current position
   std::string message_content = message.str().substr(static_cast<std::string::size_type>(message.tellg()));
   if (message_content.empty()) {
@@ -298,24 +309,18 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
     return;
   }
 
-  // Remove leading whitespace from message_content if present
-  message_content.erase(0, message_content.find_first_not_of(' '));
-
-  // Remove leading ':' if present
-  if (!message_content.empty() && message_content[0] == ':') {
-    message_content.erase(0, 1);
+  // Remove leading whitespace and leading ':' if present
+  size_t start = 0;
+  while (start < message_content.size() && (message_content[start] == ' ' || message_content[start] == ':')) {
+    ++start;
   }
+  message_content.erase(0, start);
 
   // Target is a channel
   if (target[0] == '#' || target[0] == '&') {
     Channel* channel = server_.get_channel(target);
     if (channel == NULL) {
-      std::ostringstream oss;
-      oss << "403 " << sender.nick_ << " " << target << " :No such channel\r\n";
-      sender.add_message_out(oss.str());
-
-      // sender.messages_outgoing_.append(oss.str());
-      // server_.epoll_in_out(sender.fd_);
+      reply_ERR_NOSUCHCHANNEL(sender, target);
       return;
     }
 
@@ -377,9 +382,7 @@ void MessageHandler::handle_channel_mode(Client& client, const std::string& chan
   std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
   if (it == server_.channels_.end()) {
     // Channel does not exist
-    std::ostringstream oss;
-    oss << "403 " << client.nick_ << " " << channel_name << " :No such channel\r\n";
-    client.add_message_out(oss.str());
+    reply_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
 
@@ -443,3 +446,77 @@ void MessageHandler::command_PASS(Client& client, std::stringstream& message) {
     // server_.epoll_in_out(client.fd_);
   }
 }
+
+string MessageHandler::extract_message(stringstream& message) {
+  std::string message_content;
+  std::getline(message, message_content);
+  // message.str().substr(static_cast<std::string::size_type>(message.tellg()));
+  if (message_content.empty()) {
+    return message_content;
+  }
+
+  // Remove leading whitespace and leading ':' if present
+  size_t start = 0;
+  while (start < message_content.size() && (message_content[start] == ' ' || message_content[start] == ':')) {
+    ++start;
+  }
+  message_content.erase(0, start);
+  return message_content;
+}
+
+// KICK #example bob :Spamming is not allowed
+
+
+
+void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
+  if (client.state_ != REGISTERED) {
+    return;
+  }
+  string channel_name;
+  if (!(message >> channel_name)) {
+    reply_ERR_NEEDMOREPARAMS(client, "KICK");
+    return;
+  }
+
+  string target;
+  if (!(message >> target)) {
+    reply_ERR_NEEDMOREPARAMS(client, "KICK");
+    return;
+  }
+  
+  string message_content = extract_message(message);
+  // if (message_content.empty()) {
+  //   reply_ERR_NEEDMOREPARAMS(client, "KICK");
+  //   return;
+  // }
+
+  Channel* channel;
+  if (channel_name[0] == '#' || channel_name[0] == '&') {
+  channel = server_.get_channel(channel_name);
+    if (channel == NULL) {
+      reply_ERR_NOSUCHCHANNEL(client, channel_name);
+      return;
+    }
+  }
+  else {
+    // send response, channel name invalid
+  }
+
+
+  Client* client_to_kick = channel->get_client(target);
+  if (!client_to_kick) {
+    reply_ERR_USERNOTINCHANNEL(client, target, channel_name);
+    return;
+  }
+
+
+
+
+  string parameters = channel_name + " " + target;
+
+  string reply = create_message(client, "KICK", parameters, message_content);
+  channel->broadcast(client.fd_, reply);
+
+}
+
+

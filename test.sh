@@ -4,7 +4,7 @@
 SERVER="127.0.0.1" # Replace with your IRC server's IP or hostname
 PORT="6667"        # Replace with your IRC server's port
 # PASS="test"
-NICK="testi"    # Nickname to use
+NICK="testr"    # Nickname to use
 USER="testuser 0 * :TestUser" # USER command
 CHANNEL="#fuu"     # Channel to join
 

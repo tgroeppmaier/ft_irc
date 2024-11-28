@@ -10,7 +10,7 @@ HEADER = includes/Channel.hpp includes/Client.hpp includes/IrcServ.hpp includes/
 all: $(NAME)
 
 $(NAME): $(OBJ)
-	$(CC) -o $(NAME) $(OBJ)
+	$(CC) $(CFLAGS) -o $(NAME) $(OBJ)
 
 %.o: %.cpp $(HEADER)
 	$(CC) $(CFLAGS) -c $< -o $@
