@@ -24,29 +24,40 @@ void Channel::join_message_to_all(Client& client) {
 void Channel::broadcast(int sender_fd, const std::string& message) {
   std::map<int, Client*>::const_iterator it = clients_.begin();
   for (; it != clients_.end(); ++it) {
-    if (it->first != sender_fd) { // Skip the sender
+    // if (it->first != sender_fd) { // Skip the sender
       it->second->add_message_out(message);
       // it->second->messages_outgoing_.append(message);
       server_.epoll_in_out(it->first);
-    }
+    // }
   }
 }
 
 void Channel::remove_client(Client& client) {
-  map<int, Client*>::iterator it = clients_.find(client.fd_);
-  if (it != clients_.end() && it->second == &client) {
-    clients_.erase(it);
-  }
+  // map<int, Client*>::iterator it = clients_.find(client.fd_);
+  // if (it != clients_.end() && it->second == &client) {
+  //   clients_.erase(it);
+  // }
+  kick_client(client.fd_);
 }
 
-void Channel::kick_client(Client& client, const std::string&message) {
-
+void Channel::kick_client(int fd) {
+  clients_.erase(fd);
+  admins_.erase(fd);
 }
 
 bool Channel::is_operator(int fd) {
   if (admins_.find(fd) == admins_.end()) {
     return false;
   }
+  return true;
+}
+
+bool Channel::is_on_channel(int fd) {
+  if (clients_.find(fd) == clients_.end()) {
+    std::cout << "is not on channel" << std::endl;
+    return false;
+  }
+  std::cout << "is on channel" << std::endl;
   return true;
 }
 

@@ -194,20 +194,10 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
   reply.reserve(128);
 
   reply = "001 " + client.nick_ + " :Welcome to the IRC server\r\n";
-  client.add_message_out(reply);
-
-
-  reply = "002 " + client.nick_ + " :Your host is " + inet_ntoa(server_.server_addr_.sin_addr) + ", running version 1.0\r\n";
-  client.add_message_out(reply);
-  
-
-  reply = "003 " + client.nick_ + " :This server was created today\r\n";
-  client.add_message_out(reply);
-
-  reply = "004 " + client.nick_ + " " + inet_ntoa(server_.server_addr_.sin_addr) + " 1.0 o o\r\n";
-  client.add_message_out(reply);
-
-  reply = "005 " + client.nick_ + " :Some additional information\r\n";
+  reply += "002 " + client.nick_ + " :Your host is " + inet_ntoa(server_.server_addr_.sin_addr) + ", running version 1.0\r\n";
+  reply += "003 " + client.nick_ + " :This server was created today\r\n";
+  reply += "004 " + client.nick_ + " " + inet_ntoa(server_.server_addr_.sin_addr) + " 1.0 o o\r\n";
+  reply += "005 " + client.nick_ + " :Some additional information\r\n";
   client.add_message_out(reply);
 
   std::cout << "Handling USER command for client " << client.username_ << std::endl;
@@ -324,6 +314,10 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
       return;
     }
 
+  if (!(channel->is_on_channel(sender.fd_))) {
+    reply_ERR_USERNOTINCHANNEL(sender, sender.nick_, target);
+    return;
+  }
     // Construct the PRIVMSG message
     std::ostringstream oss;
     // cout << "Hostname: " << sender.hostname_ << std::endl;
@@ -483,12 +477,6 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
     reply_ERR_NEEDMOREPARAMS(client, "KICK");
     return;
   }
-  
-  string message_content = extract_message(message);
-  // if (message_content.empty()) {
-  //   reply_ERR_NEEDMOREPARAMS(client, "KICK");
-  //   return;
-  // }
 
   Channel* channel;
   if (channel_name[0] == '#' || channel_name[0] == '&') {
@@ -502,21 +490,17 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
     // send response, channel name invalid
   }
 
-
   Client* client_to_kick = channel->get_client(target);
   if (!client_to_kick) {
     reply_ERR_USERNOTINCHANNEL(client, target, channel_name);
     return;
   }
 
-
-
-
+  string message_content = extract_message(message);
   string parameters = channel_name + " " + target;
-
   string reply = create_message(client, "KICK", parameters, message_content);
   channel->broadcast(client.fd_, reply);
-
+  channel->kick_client(client_to_kick->fd_);
 }
 
 

@@ -34,10 +34,11 @@ public:
   void join_message_to_all(Client& client);
   void broadcast(int sender_fd, const std::string& message);
   void remove_client(Client& client);
-  void kick_client(Client& client, const std::string&message);
+  void kick_client(int fd);
   Client* get_client(const std::string& name);
 
   bool is_operator(int fd);
+  bool is_on_channel(int fd);
   // std::deque<std::pair<int, std::string> > get_users();
 
 };
