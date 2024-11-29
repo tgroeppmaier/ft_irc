@@ -91,7 +91,7 @@ void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, const string& comm
 }
 
 void MessageHandler::reply_ERR_USERNOTINCHANNEL(Client& client, const string& target_nick, const string& channel) {
-  string message = "441 " + client.nick_ + " " + target_nick + " " + channel + " :They aren't on that channel\r\n";
+  string message = "441 " + client.nick_ + " " + channel + " :They aren't on that channel\r\n";
   client.add_message_out(message);
 }
 
@@ -469,41 +469,33 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
   if (client.state_ != REGISTERED) {
     return;
   }
-  string channel_name;
-  if (!(message >> channel_name)) {
+  std::string channel_name, target;
+  if (!(message >> channel_name >> target)) {
     reply_ERR_NEEDMOREPARAMS(client, "KICK");
     return;
   }
-
-  string target;
-  if (!(message >> target)) {
-    reply_ERR_NEEDMOREPARAMS(client, "KICK");
-    return;
-  }
-
   Channel* channel = server_.get_channel(channel_name);
   if (!channel || (channel_name[0] != '#' && channel_name[0] != '&')) {
     reply_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
-
   if (!channel->is_on_channel(client.fd_)) {
     reply_ERR_NOTONCHANNEL(client, channel_name);
     return;
   }
-
   if (!channel->is_operator(client.fd_)) {
     reply_ERR_CHANOPRIVSNEEDED(client, channel_name);
     return;
   }
-
   Client* client_to_kick = channel->get_client(target);
   if (!client_to_kick) {
     reply_ERR_USERNOTINCHANNEL(client, target, channel_name);
     return;
   }
-
   string message_content = extract_message(message);
+  if (message_content.empty()) {
+    message_content = "No reason specified";
+  }
   string parameters = channel_name + " " + target;
   string reply = create_message(client, "KICK", parameters, message_content);
   channel->broadcast(client.fd_, reply);
