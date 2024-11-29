@@ -44,6 +44,7 @@ public:
   void message_to_all_channels(int sender_fd, const std::string& message);
   void remove_from_all_channels();
   void add_client_to_channel(const std::string& name, Channel* channel);
+  bool chan_limit_reached();
 
 };
 

@@ -14,6 +14,8 @@
 class Client;
 class IrcServ;
 
+#define USER_LIMIT 1
+
 class Channel {
 private:
   IrcServ& server_;

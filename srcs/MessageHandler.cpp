@@ -90,14 +90,12 @@ void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, const string& comm
   }
 }
 
-void MessageHandler::reply_ERR_USERNOTINCHANNEL(Client& client, const string& target_nick, const string& channel) {
+void MessageHandler::reply_ERR_USERNOTINCHANNEL(Client& client, const string& channel) {
   string message = "441 " + client.nick_ + " " + channel + " :They aren't on that channel\r\n";
   client.add_message_out(message);
 }
 
 void MessageHandler::reply_ERR_NOSUCHCHANNEL(Client& client, const string& channel_name) {
-  // std::string server_address = inet_ntoa(server_.server_addr_.sin_addr);
-  // std::string error_message = ":" + server_address + " 403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
   string error_message = "403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
   client.add_message_out(error_message);
 }
@@ -112,6 +110,11 @@ void MessageHandler::reply_ERR_NOTONCHANNEL(Client& client, const string& channe
   client.add_message_out(error_message);
 }
 
+void MessageHandler::reply_ERR_TOOMANYCHANNELS(Client& client, const string& channel_name) {
+  string error_message = "405 " + client.nick_ + " " + channel_name + " :You have joined too many channels\r\n";
+  client.add_message_out(error_message);
+}
+
 string MessageHandler::create_message(Client& client, const string& command, const string& parameters, const string& message_content) {
   string message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " " + command + " " + parameters + " :" + message_content + "\r\n";
   return message;
@@ -121,9 +124,6 @@ string MessageHandler::create_message(Client& client, const string& command, con
 void MessageHandler::client_not_registered(Client& client) {
   string message = "451 * :You have not registered\r\n";
   client.add_message_out(message);
-
-  // client.messages_outgoing_.append(oss.str());
-  // cout << oss.str() << std::endl;
   server_.add_to_close(&client);
 }
 
@@ -147,6 +147,7 @@ void MessageHandler::command_NICK(Client& client, std::stringstream& message) {
   }
   else {
     reply_ERR_NEEDMOREPARAMS(client, "NICK");
+    return;
   }
   if (client.state_ == WAITING_FOR_NICK) {
     client.state_ = WAITING_FOR_USER;
@@ -160,8 +161,6 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
   if (client.state_ == REGISTERED) {
     string reply = "462 " + client.nick_ + " :You may not reregister\r\n";
     client.add_message_out(reply);
-    
-    // client.messages_outgoing_.append(reply);
     return;
   }
   
@@ -188,19 +187,18 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
     cout << "State after User: " << client.state_ << std::endl;
   }
 
-
   client.username_ = username;
   // client.hostname_ = hostname;
   client.realname_ = realname;
 
   std::string reply;
   reply.reserve(128);
-
-  reply = "001 " + client.nick_ + " :Welcome to the IRC server\r\n";
-  reply += "002 " + client.nick_ + " :Your host is " + inet_ntoa(server_.server_addr_.sin_addr) + ", running version 1.0\r\n";
-  reply += "003 " + client.nick_ + " :This server was created today\r\n";
-  reply += "004 " + client.nick_ + " " + inet_ntoa(server_.server_addr_.sin_addr) + " 1.0 o o\r\n";
-  reply += "005 " + client.nick_ + " :Some additional information\r\n";
+  
+  reply.append("001 ").append(client.nick_).append(" :Welcome to the IRC server\r\n");
+  reply.append("002 ").append(client.nick_).append(" :Your host is ").append(inet_ntoa(server_.server_addr_.sin_addr)).append(", running version 1.0\r\n");
+  reply.append("003 ").append(client.nick_).append(" :This server was created today\r\n");
+  reply.append("004 ").append(client.nick_).append(" ").append(inet_ntoa(server_.server_addr_.sin_addr)).append(" 1.0 o o\r\n");
+  reply.append("005 ").append(client.nick_).append(" :Some additional information\r\n");
   client.add_message_out(reply);
 
   std::cout << "Handling USER command for client " << client.username_ << std::endl;
@@ -276,6 +274,10 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
       continue;
     }
 
+    if (client.chan_limit_reached()) {
+      reply_ERR_TOOMANYCHANNELS(client, channel_name);
+      return;
+    }
     std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
     if (it == server_.channels_.end()) {
       server_.create_channel(channel_name, client);
@@ -318,7 +320,7 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
     }
 
   if (!(channel->is_on_channel(sender.fd_))) {
-    reply_ERR_USERNOTINCHANNEL(sender, sender.nick_, target);
+    reply_ERR_USERNOTINCHANNEL(sender, target);
     return;
   }
     // Construct the PRIVMSG message
@@ -489,7 +491,7 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
   }
   Client* client_to_kick = channel->get_client(target);
   if (!client_to_kick) {
-    reply_ERR_USERNOTINCHANNEL(client, target, channel_name);
+    reply_ERR_USERNOTINCHANNEL(client, channel_name);
     return;
   }
   string message_content = extract_message(message);
@@ -502,4 +504,11 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
   channel->remove_client(client_to_kick->fd_);
 }
 
+void MessageHandler::command_INVITE(Client& client, std::stringstream& message) {
+  if (client.state_ != REGISTERED) {
+    return;
+  }
+  std::string channel_name, target;
+
+}
 

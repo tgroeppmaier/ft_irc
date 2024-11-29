@@ -50,3 +50,10 @@ void Client::add_client_to_channel(const string& name, Channel* channel) {
   channels_[name] = channel;
 }
 
+bool Client::chan_limit_reached() {
+  if (channels_.size() >= USER_LIMIT) {
+    return true;
+  }
+  return false;
+}
+

@@ -40,12 +40,14 @@ private:
   void command_PRIVMSG(Client& client, std::stringstream& message);
   void command_PASS(Client& client, std::stringstream& message);
   void command_KICK(Client& client, std::stringstream& message);
+  void command_INVITE(Client& client, std::stringstream& message);
 
   void reply_ERR_NEEDMOREPARAMS(Client& client, const std::string& command);
-  void reply_ERR_USERNOTINCHANNEL(Client& client, const std::string& nick, const std::string& channel);
+  void reply_ERR_USERNOTINCHANNEL(Client& client, const std::string& channel);
   void reply_ERR_NOSUCHCHANNEL(Client& client, const std::string& channel);
   void reply_ERR_CHANOPRIVSNEEDED(Client& client, const std::string& channel);
   void reply_ERR_NOTONCHANNEL(Client& client, const std::string& channel);
+  void reply_ERR_TOOMANYCHANNELS(Client& client, const std::string& channel);
 
 public:
   MessageHandler(IrcServ& server);

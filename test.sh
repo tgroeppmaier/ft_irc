@@ -24,6 +24,6 @@ CHANNEL="#fuu"     # Channel to join
     while true; do
         echo "PRIVMSG $CHANNEL :$COUNT"
         ((COUNT++))
-        sleep .01
+        sleep .001
     done
 } | telnet $SERVER $PORT
