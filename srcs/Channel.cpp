@@ -36,7 +36,6 @@ void Channel::add_client(Client& client) {
   client.add_client_to_channel(name_, this);
   clients_[client.fd_] = &client;
 
-
   string join_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " JOIN " + name_ + "\r\n";
 
   // Create and send 353 (RPL_NAMREPLY) message
@@ -53,7 +52,13 @@ void Channel::add_client(Client& client) {
   // Create and send 366 (RPL_ENDOFNAMES) message
   std::string endofnames_message = "366 " + client.nick_ + " " + name_ + " :End of /NAMES list\r\n";
   client.add_message_out(endofnames_message);
-
+  
+  // Loop to print out all client nicknames on the channel
+  std::cout << "Clients on channel " << name_ << ": ";
+  for (it = clients_.begin(); it != clients_.end(); ++it) {
+    std::cout << it->second->nick_ << " ";
+  }
+  std::cout << std::endl;  
 
 }
 
@@ -82,9 +87,10 @@ bool Channel::is_on_channel(int fd) {
 }
 
 Client* Channel::get_client(const std::string& name) {
-  map<int, Client*>::const_iterator it = clients_.begin();
-  if ((*it).second->nick_ == name) {
-    return (*it).second;
+  for (map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
+    if (it->second->nick_ == name) {
+      return it->second;
+    }
   }
   return NULL;
 }

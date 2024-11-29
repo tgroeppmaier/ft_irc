@@ -33,9 +33,9 @@ MessageHandler::~MessageHandler() {
 void MessageHandler::send_messages(Client& client) {
   size_t length = client.messages_outgoing_.length();
   ssize_t bytes_sent = send(client.fd_, client.messages_outgoing_.c_str(), length, MSG_NOSIGNAL);
-  if (bytes_sent > 0) {
-    cout << client.messages_outgoing_.substr(0, static_cast<size_t>(bytes_sent)) << std::endl; // DEBUG
-  }
+  // if (bytes_sent > 0) {
+  //   cout << client.messages_outgoing_.substr(0, static_cast<size_t>(bytes_sent)) << std::endl; // DEBUG
+  // }
   if (bytes_sent == static_cast<ssize_t>(length)) { // all messages have been sent
     client.messages_outgoing_.clear();
     epoll_event ev;
@@ -90,17 +90,25 @@ void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, const string& comm
   }
 }
 
-#include <arpa/inet.h> // For inet_ntoa
-
 void MessageHandler::reply_ERR_USERNOTINCHANNEL(Client& client, const string& target_nick, const string& channel) {
-  string message = "441 " + target_nick + " " + channel + " :They aren't on that channel\r\n";
+  string message = "441 " + client.nick_ + " " + target_nick + " " + channel + " :They aren't on that channel\r\n";
   client.add_message_out(message);
 }
 
 void MessageHandler::reply_ERR_NOSUCHCHANNEL(Client& client, const string& channel_name) {
   // std::string server_address = inet_ntoa(server_.server_addr_.sin_addr);
   // std::string error_message = ":" + server_address + " 403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
-  std::string error_message = "403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
+  string error_message = "403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
+  client.add_message_out(error_message);
+}
+
+void MessageHandler::reply_ERR_CHANOPRIVSNEEDED(Client& client, const string& channel_name) {
+  string error_message = "482 " + client.nick_ + " " + channel_name + " :You're not channel operator\r\n";
+  client.add_message_out(error_message);
+}
+
+void MessageHandler::reply_ERR_NOTONCHANNEL(Client& client, const string& channel_name) {
+  string error_message = "442 " + client.nick_ + " " + channel_name + " :You're not on that channel\r\n";
   client.add_message_out(error_message);
 }
 
@@ -271,11 +279,9 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
     std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
     if (it == server_.channels_.end()) {
       server_.create_channel(channel_name, client);
-    } else {
-      Channel* channel = server_.channels_[channel_name];
-      channel->add_client(client);
-      // server_.join_channel(channel_name, client);
-    }
+      return;
+    } 
+    (*it).second->add_client(client);
   }
 }
 
@@ -432,7 +438,7 @@ void MessageHandler::command_PASS(Client& client, std::stringstream& message) {
   } 
   else {
     std::string error_message = "464 * :Password incorrect\r\n";
-    client.messages_outgoing_.append(error_message);
+    client.add_message_out(error_message);
     client_not_registered(client);
     // server_.epoll_in_out(client.fd_);
   }
@@ -475,16 +481,20 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
     return;
   }
 
-  Channel* channel;
-  if (channel_name[0] == '#' || channel_name[0] == '&') {
-  channel = server_.get_channel(channel_name);
-    if (channel == NULL) {
-      reply_ERR_NOSUCHCHANNEL(client, channel_name);
-      return;
-    }
+  Channel* channel = server_.get_channel(channel_name);
+  if (!channel || (channel_name[0] != '#' && channel_name[0] != '&')) {
+    reply_ERR_NOSUCHCHANNEL(client, channel_name);
+    return;
   }
-  else {
-    // send response, channel name invalid
+
+  if (!channel->is_on_channel(client.fd_)) {
+    reply_ERR_NOTONCHANNEL(client, channel_name);
+    return;
+  }
+
+  if (!channel->is_operator(client.fd_)) {
+    reply_ERR_CHANOPRIVSNEEDED(client, channel_name);
+    return;
   }
 
   Client* client_to_kick = channel->get_client(target);

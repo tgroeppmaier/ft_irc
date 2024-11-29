@@ -44,6 +44,8 @@ private:
   void reply_ERR_NEEDMOREPARAMS(Client& client, const std::string& command);
   void reply_ERR_USERNOTINCHANNEL(Client& client, const std::string& nick, const std::string& channel);
   void reply_ERR_NOSUCHCHANNEL(Client& client, const std::string& channel);
+  void reply_ERR_CHANOPRIVSNEEDED(Client& client, const std::string& channel);
+  void reply_ERR_NOTONCHANNEL(Client& client, const std::string& channel);
 
 public:
   MessageHandler(IrcServ& server);
