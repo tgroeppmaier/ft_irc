@@ -71,37 +71,6 @@ void IrcServ::cleanup_clients() {
   
 }
 
-
-
-void IrcServ::join_channel(const std::string& name, Client& client) {
-  Channel* channel = channels_[name];
-  channel->clients_[client.fd_] = &client;
-  client.add_channel(name, channel);
-
-  // channel->join_message_to_all(client);  
-
-  string join_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " JOIN " + name + "\r\n";
-
-  // Create and send 353 (RPL_NAMREPLY) message
-  string users;
-  map<int, Client*>::const_iterator it = channels_[name]->clients_.begin();
-  for (; it != channels_[name]->clients_.end(); ++it) {
-    users += it->second->nick_ + ' ';
-    (*it).second->add_message_out(join_message);
-    // it->second->messages_outgoing_.append(join_message);
-    epoll_in_out(it->first);
-  }
-  std::string namreply_message = "353 " + client.nick_ + " = " + name + " :" + users + "\r\n";
-  client.add_message_out(namreply_message);
-  // client.messages_outgoing_.append(namreply_message);
-
-  // Create and send 366 (RPL_ENDOFNAMES) message
-  std::string endofnames_message = "366 " + client.nick_ + " " + name + " :End of /NAMES list\r\n";
-  client.add_message_out(endofnames_message);
-  // client.messages_outgoing_.append(endofnames_message);
-
-}
-
 Channel* IrcServ::get_channel(const std::string& name) {
   map<const string, Channel*>::const_iterator it = channels_.find(name);
   if (it == channels_.end()) {
@@ -119,28 +88,11 @@ Channel* IrcServ::get_channel(const std::string& name) {
 //   return it->second;
 // }
 
-
-
-
-void IrcServ::create_channel(const std::string& name, Client& admin) {
-  Channel* channel = new Channel(*this, name, admin);
+void IrcServ::create_channel(const std::string& name, Client& client) {
+  Channel* channel = new Channel(*this, name, client);
   channels_[name] = channel;
-  admin.add_channel(name, channel);
-
-  // Create and send JOIN message
-  std::string join_message = ":" + admin.nick_ + "!" + admin.username_ + "@" + admin.hostname_ + " JOIN " + name + "\r\n";
-  admin.add_message_out(join_message);
-  // admin.messages_outgoing_.append(join_message);
-
-  // Create and send 353 (RPL_NAMREPLY) message
-  std::string namreply_message = "353 " + admin.nick_ + " = " + name + " :" + admin.nick_ + "\r\n";
-  admin.add_message_out(namreply_message);
-  // admin.messages_outgoing_.append(namreply_message);
-
-  // Create and send 366 (RPL_ENDOFNAMES) message
-  std::string endofnames_message = "366 " + admin.nick_ + " " + name + " :End of /NAMES list\r\n";
-  admin.add_message_out(endofnames_message);
-  // admin.messages_outgoing_.append(endofnames_message);
+  channel->add_client(client);
+  channel->add_operator(client);
 }
 
 void IrcServ::signal_handler(int signal) {

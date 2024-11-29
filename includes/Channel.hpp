@@ -21,20 +21,19 @@ private:
   int user_count_;
   std::string name_;
   std::string password_;
+  std::map<int, Client*> clients_;
 
 
 public:
   Channel(IrcServ& server, const std::string name, Client& admin);
   ~Channel();
-  // vector<int> users_;
-  // vector<int> operators_;
-  std::map<int, Client*> clients_;
   std::map<int, Client*> admins_;
 
-  void join_message_to_all(Client& client);
+  // void join_message_to_all(Client& client);
   void broadcast(int sender_fd, const std::string& message);
+  void add_client(Client& client);
+  void add_operator(Client& client);
   void remove_client(int fd);
-  // void kick_client(int fd);
   Client* get_client(const std::string& name);
 
   bool is_operator(int fd);

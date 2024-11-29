@@ -54,10 +54,6 @@ void MessageHandler::send_messages(Client& client) {
   }
 }
 
-// void MessageHandler::process_messages(Client& client, const string& message) {
-
-// }
-
 void MessageHandler::process_incoming_messages(Client& client) {
   size_t start = 0;
   size_t end = 0;
@@ -79,7 +75,6 @@ void MessageHandler::process_incoming_messages(Client& client) {
     } else {
       message  = "421 " + client.nick_ + " " + command + " :Unknown command\r\n";
       client.add_message_out(message);
-      // client.messages_outgoing_.append(message);
       std::cout << "Unknown command: " << command << std::endl;
     }
   }
@@ -277,7 +272,9 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
     if (it == server_.channels_.end()) {
       server_.create_channel(channel_name, client);
     } else {
-      server_.join_channel(channel_name, client);
+      Channel* channel = server_.channels_[channel_name];
+      channel->add_client(client);
+      // server_.join_channel(channel_name, client);
     }
   }
 }
