@@ -33,8 +33,8 @@ public:
 
   void join_message_to_all(Client& client);
   void broadcast(int sender_fd, const std::string& message);
-  void remove_client(Client& client);
-  void kick_client(int fd);
+  void remove_client(int fd);
+  // void kick_client(int fd);
   Client* get_client(const std::string& name);
 
   bool is_operator(int fd);

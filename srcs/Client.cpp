@@ -42,7 +42,7 @@ void Client::message_to_all_channels(int sender_fd, const std::string& message) 
 void Client::remove_from_all_channels() {
   map<string, Channel*>::iterator it;
   for (it = channels_.begin(); it != channels_.end(); ++it) {
-    (*it).second->remove_client(*this);
+    (*it).second->remove_client(fd_);
   }
 }
 

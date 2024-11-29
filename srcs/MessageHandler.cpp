@@ -500,7 +500,7 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
   string parameters = channel_name + " " + target;
   string reply = create_message(client, "KICK", parameters, message_content);
   channel->broadcast(client.fd_, reply);
-  channel->kick_client(client_to_kick->fd_);
+  channel->remove_client(client_to_kick->fd_);
 }
 
 

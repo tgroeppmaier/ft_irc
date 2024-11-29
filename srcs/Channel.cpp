@@ -32,18 +32,13 @@ void Channel::broadcast(int sender_fd, const std::string& message) {
   }
 }
 
-void Channel::remove_client(Client& client) {
-  // map<int, Client*>::iterator it = clients_.find(client.fd_);
-  // if (it != clients_.end() && it->second == &client) {
-  //   clients_.erase(it);
-  // }
-  kick_client(client.fd_);
-}
-
-void Channel::kick_client(int fd) {
+void Channel::remove_client(int fd) {
   clients_.erase(fd);
   admins_.erase(fd);
 }
+
+// void Channel::kick_client(int fd) {
+// }
 
 bool Channel::is_operator(int fd) {
   if (admins_.find(fd) == admins_.end()) {
