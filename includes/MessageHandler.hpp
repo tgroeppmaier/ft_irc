@@ -8,6 +8,23 @@
 #include "IrcServ.hpp"
 #include <sstream>
 
+#define REPLY_ERR_NEEDMOREPARAMS(client, command) \
+  client.add_message_out("461 " + client.nick_ + " " + command + " :Not enough parameters\r\n")
+
+#define REPLY_ERR_USERNOTINCHANNEL(client, channel) \
+  client.add_message_out("441 " + client.nick_ + " " + channel + " :They aren't on that channel\r\n")
+
+#define REPLY_ERR_NOSUCHCHANNEL(client, channel_name) \
+  client.add_message_out("403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n")
+
+#define REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name) \
+  client.add_message_out("482 " + client.nick_ + " " + channel_name + " :You're not channel operator\r\n")
+
+#define REPLY_ERR_NOTONCHANNEL(client, channel_name) \
+  client.add_message_out("442 " + client.nick_ + " " + channel_name + " :You're not on that channel\r\n")
+
+#define REPLY_ERR_TOOMANYCHANNELS(client, channel_name) \
+  client.add_message_out("405 " + client.nick_ + " " + channel_name + " :You have joined too many channels\r\n")
 
 
 
@@ -42,12 +59,6 @@ private:
   void command_KICK(Client& client, std::stringstream& message);
   void command_INVITE(Client& client, std::stringstream& message);
 
-  void reply_ERR_NEEDMOREPARAMS(Client& client, const std::string& command);
-  void reply_ERR_USERNOTINCHANNEL(Client& client, const std::string& channel);
-  void reply_ERR_NOSUCHCHANNEL(Client& client, const std::string& channel);
-  void reply_ERR_CHANOPRIVSNEEDED(Client& client, const std::string& channel);
-  void reply_ERR_NOTONCHANNEL(Client& client, const std::string& channel);
-  void reply_ERR_TOOMANYCHANNELS(Client& client, const std::string& channel);
 
 public:
   MessageHandler(IrcServ& server);

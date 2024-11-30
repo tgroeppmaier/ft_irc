@@ -83,38 +83,6 @@ void MessageHandler::process_incoming_messages(Client& client) {
   // cout << client.messages_outgoing_ << std::endl; // DEBUG
 }
 
-void MessageHandler::reply_ERR_NEEDMOREPARAMS(Client& client, const string& command) {
-  if (!command.empty()) {
-    string message  = "461 " + client.nick_ + " " + command + " :Not enough parameters\r\n";
-    client.add_message_out(message);
-  }
-}
-
-void MessageHandler::reply_ERR_USERNOTINCHANNEL(Client& client, const string& channel) {
-  string message = "441 " + client.nick_ + " " + channel + " :They aren't on that channel\r\n";
-  client.add_message_out(message);
-}
-
-void MessageHandler::reply_ERR_NOSUCHCHANNEL(Client& client, const string& channel_name) {
-  string error_message = "403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n";
-  client.add_message_out(error_message);
-}
-
-void MessageHandler::reply_ERR_CHANOPRIVSNEEDED(Client& client, const string& channel_name) {
-  string error_message = "482 " + client.nick_ + " " + channel_name + " :You're not channel operator\r\n";
-  client.add_message_out(error_message);
-}
-
-void MessageHandler::reply_ERR_NOTONCHANNEL(Client& client, const string& channel_name) {
-  string error_message = "442 " + client.nick_ + " " + channel_name + " :You're not on that channel\r\n";
-  client.add_message_out(error_message);
-}
-
-void MessageHandler::reply_ERR_TOOMANYCHANNELS(Client& client, const string& channel_name) {
-  string error_message = "405 " + client.nick_ + " " + channel_name + " :You have joined too many channels\r\n";
-  client.add_message_out(error_message);
-}
-
 string MessageHandler::create_message(Client& client, const string& command, const string& parameters, const string& message_content) {
   string message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " " + command + " " + parameters + " :" + message_content + "\r\n";
   return message;
@@ -146,7 +114,7 @@ void MessageHandler::command_NICK(Client& client, std::stringstream& message) {
     client.nick_ = nick;
   }
   else {
-    reply_ERR_NEEDMOREPARAMS(client, "NICK");
+    REPLY_ERR_NEEDMOREPARAMS(client, "NICK");
     return;
   }
   if (client.state_ == WAITING_FOR_NICK) {
@@ -172,14 +140,14 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
   std::string username, user_mode, hostname, realname;
 
   if (!(message >> username >> user_mode >> hostname)) {
-    reply_ERR_NEEDMOREPARAMS(client, "USER");
+    REPLY_ERR_NEEDMOREPARAMS(client, "USER");
     return;
   }
 
   // Extract the realname which may contain spaces
   std::getline(message >> std::ws, realname);
   if (realname.empty()) {
-    reply_ERR_NEEDMOREPARAMS(client, "USER");
+    REPLY_ERR_NEEDMOREPARAMS(client, "USER");
     return;
   }
   if (client.state_ == WAITING_FOR_USER) {
@@ -216,7 +184,7 @@ void MessageHandler::command_PING(Client& client, std::stringstream& message) {
     client.add_message_out(reply);
   }
   else {
-    reply_ERR_NEEDMOREPARAMS(client, "PING");
+    REPLY_ERR_NEEDMOREPARAMS(client, "PING");
   }
 }
 
@@ -243,7 +211,7 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
 
   // Extract the channels and keys from the message
   if (!(message >> channels_str)) {
-    reply_ERR_NEEDMOREPARAMS(client, "JOIN");
+    REPLY_ERR_NEEDMOREPARAMS(client, "JOIN");
     return;
   }
   std::getline(message, keys_str);
@@ -270,12 +238,12 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
   for (size_t i = 0; i < channels.size(); ++i) {
     std::string channel_name = channels[i];
     if (channel_name[0] != '#' && channel_name[0] != '&') {
-      reply_ERR_NOSUCHCHANNEL(client, channel_name);
+      REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
       continue;
     }
 
     if (client.chan_limit_reached()) {
-      reply_ERR_TOOMANYCHANNELS(client, channel_name);
+      REPLY_ERR_TOOMANYCHANNELS(client, channel_name);
       return;
     }
     std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
@@ -294,13 +262,13 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
   }
   std::string target;
   if (!(message >> target)) {
-    reply_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
+    REPLY_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
     return;
   }
   // Extract the remaining message content from the current position
   std::string message_content = message.str().substr(static_cast<std::string::size_type>(message.tellg()));
   if (message_content.empty()) {
-    reply_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
+    REPLY_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
     return;
   }
 
@@ -315,12 +283,12 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
   if (target[0] == '#' || target[0] == '&') {
     Channel* channel = server_.get_channel(target);
     if (channel == NULL) {
-      reply_ERR_NOSUCHCHANNEL(sender, target);
+      REPLY_ERR_NOSUCHCHANNEL(sender, target);
       return;
     }
 
   if (!(channel->is_on_channel(sender.fd_))) {
-    reply_ERR_USERNOTINCHANNEL(sender, target);
+    REPLY_ERR_USERNOTINCHANNEL(sender, target);
     return;
   }
     // Construct the PRIVMSG message
@@ -363,7 +331,7 @@ void MessageHandler::command_MODE(Client& client, std::stringstream& message) {
   }
   std::string target;
   if (!(message >> target)) {
-    reply_ERR_NEEDMOREPARAMS(client, "MODE");
+    REPLY_ERR_NEEDMOREPARAMS(client, "MODE");
     return;
   }
 
@@ -381,7 +349,7 @@ void MessageHandler::handle_channel_mode(Client& client, const std::string& chan
   std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
   if (it == server_.channels_.end()) {
     // Channel does not exist
-    reply_ERR_NOSUCHCHANNEL(client, channel_name);
+    REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
 
@@ -431,7 +399,7 @@ void MessageHandler::command_PASS(Client& client, std::stringstream& message) {
 
   std::string password;
   if (!(message >> password)) {
-    reply_ERR_NEEDMOREPARAMS(client, "PASS");
+    REPLY_ERR_NEEDMOREPARAMS(client, "PASS");
     client_not_registered(client);
     return;
   }
@@ -473,25 +441,25 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
   }
   std::string channel_name, target;
   if (!(message >> channel_name >> target)) {
-    reply_ERR_NEEDMOREPARAMS(client, "KICK");
+    REPLY_ERR_NEEDMOREPARAMS(client, "KICK");
     return;
   }
   Channel* channel = server_.get_channel(channel_name);
   if (!channel || (channel_name[0] != '#' && channel_name[0] != '&')) {
-    reply_ERR_NOSUCHCHANNEL(client, channel_name);
+    REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
   if (!channel->is_on_channel(client.fd_)) {
-    reply_ERR_NOTONCHANNEL(client, channel_name);
+    REPLY_ERR_NOTONCHANNEL(client, channel_name);
     return;
   }
   if (!channel->is_operator(client.fd_)) {
-    reply_ERR_CHANOPRIVSNEEDED(client, channel_name);
+    REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name);
     return;
   }
   Client* client_to_kick = channel->get_client(target);
   if (!client_to_kick) {
-    reply_ERR_USERNOTINCHANNEL(client, channel_name);
+    REPLY_ERR_USERNOTINCHANNEL(client, channel_name);
     return;
   }
   string message_content = extract_message(message);
