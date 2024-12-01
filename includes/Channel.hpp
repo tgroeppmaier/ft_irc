@@ -6,7 +6,7 @@
 // #include <vector>
 #include <map>
 #include <string>
-#include <deque>
+#include <set>
 #include "Client.hpp"
 #include "IrcServ.hpp"
 // #include "IrcServ.hpp"
@@ -14,7 +14,7 @@
 class Client;
 class IrcServ;
 
-#define USER_LIMIT 1
+// #define MAX_USERS_PER_CHANNEL 3
 
 class Channel {
 private:
@@ -24,12 +24,12 @@ private:
   std::string name_;
   std::string password_;
   std::map<int, Client*> clients_;
-
+  std::map<int, Client*> operators_;
+  std::set<char> modes_;
 
 public:
-  Channel(IrcServ& server, const std::string name, Client& admin);
+  Channel(IrcServ& server, const std::string name, Client& client);
   ~Channel();
-  std::map<int, Client*> admins_;
 
   // void join_message_to_all(Client& client);
   void broadcast(int sender_fd, const std::string& message);
@@ -40,6 +40,8 @@ public:
 
   bool is_operator(int fd);
   bool is_on_channel(int fd);
+  void set_mode(const std::string& modes);
+  std::string get_mode();
   // std::deque<std::pair<int, std::string> > get_users();
 
 };

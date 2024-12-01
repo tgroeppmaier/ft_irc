@@ -193,7 +193,6 @@ bool IrcServ::add_fd_to_epoll(int fd) {
   if (epoll_ctl(ep_fd_, EPOLL_CTL_ADD, fd, &ev) == -1) {
     perror("Error adding server socket to epoll");
     return false;
-    // exit(EXIT_FAILURE);
   }
   return true;
 }

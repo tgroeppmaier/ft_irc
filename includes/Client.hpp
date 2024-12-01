@@ -8,6 +8,8 @@
 #include <map>
 #include "Channel.hpp"
 
+#define MAX_CHANNELS_PER_USER 3
+
 enum ConnectionState {
   WAITING_FOR_PASS,
   WAITING_FOR_NICK,

@@ -52,10 +52,7 @@ public:
   void close_socket(int fd);
   void delete_client(int fd);
   void add_to_close(Client* client);
-
   void create_channel(const std::string& name, Client& admin);
-  void join_channel(const std::string& name, Client& admin);
-
   void epoll_in_out(int fd);
 
   Channel* get_channel(const std::string& name);
@@ -67,7 +64,6 @@ public:
   void start();
   void cleanup();
 
-  // int SetPort(int port);
 };
 
 #endif

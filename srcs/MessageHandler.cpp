@@ -88,8 +88,16 @@ string MessageHandler::create_message(Client& client, const string& command, con
   return message;
 }
 
+bool MessageHandler::client_registered(Client& client) {
+  if (client.state_ != REGISTERED) {
+    ERR_NOTREGISTERED(client);
+    return false;
+  }
+  return true;
+}
 
-void MessageHandler::client_not_registered(Client& client) {
+
+void MessageHandler::ERR_NOTREGISTERED(Client& client) {
   string message = "451 * :You have not registered\r\n";
   client.add_message_out(message);
   server_.add_to_close(&client);
@@ -97,7 +105,7 @@ void MessageHandler::client_not_registered(Client& client) {
 
 void MessageHandler::command_CAP(Client& client, std::stringstream& /* message */) {
   if (client.state_ != WAITING_FOR_NICK) {
-    client_not_registered(client);
+    ERR_NOTREGISTERED(client);
     return;
   }
   std::cout << "Handling CAP command for client " << client.fd_ << std::endl;
@@ -105,7 +113,7 @@ void MessageHandler::command_CAP(Client& client, std::stringstream& /* message *
 
 void MessageHandler::command_NICK(Client& client, std::stringstream& message) {
   if (client.state_ != WAITING_FOR_NICK && client.state_ != REGISTERED) {
-    client_not_registered(client);
+    ERR_NOTREGISTERED(client);
     return;
   }
 
@@ -133,7 +141,7 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
   }
   
   if (client.state_ != WAITING_FOR_USER) {
-    client_not_registered(client);
+    ERR_NOTREGISTERED(client);
     return;
   }
   
@@ -174,8 +182,7 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
 
 
 void MessageHandler::command_PING(Client& client, std::stringstream& message) {
-  if (client.state_ != REGISTERED) {
-    client_not_registered(client);
+  if (!client_registered(client)) {
     return;
   }
   string target;
@@ -202,8 +209,7 @@ void MessageHandler::command_QUIT(Client& client, std::stringstream& message) {
 }
 
 void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
-  if (client.state_ != REGISTERED) {
-    client_not_registered(client);
+  if (!client_registered(client)) {
     return;
   }
   std::string channels_str;
@@ -256,8 +262,7 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
 }
 
 void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message) {
-  if (sender.state_ != REGISTERED) {
-    client_not_registered(sender);
+  if (!client_registered(sender)) {
     return;
   }
   std::string target;
@@ -291,15 +296,9 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
     REPLY_ERR_USERNOTINCHANNEL(sender, target);
     return;
   }
-    // Construct the PRIVMSG message
-    std::ostringstream oss;
-    // cout << "Hostname: " << sender.hostname_ << std::endl;
-    oss << ":" << sender.nick_ << "!" << sender.username_ << "@" << sender.hostname_ << " PRIVMSG " << target << " :" << message_content << "\r\n";
-
-    // Broadcast the message to the channel
-    channel->broadcast(sender.fd_, oss.str());
-    // std::cout << "Broadcast: " << oss.str() << std::endl;
-
+  std::ostringstream oss;
+  oss << ":" << sender.nick_ << "!" << sender.username_ << "@" << sender.hostname_ << " PRIVMSG " << target << " :" << message_content << "\r\n";
+  channel->broadcast(sender.fd_, oss.str());
   } else {
     // Handle sending message to a user
     // Client* target_client = server_.get_client_by_nick(target);
@@ -321,12 +320,8 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
   }
 }
 
-
-
-
 void MessageHandler::command_MODE(Client& client, std::stringstream& message) {
-  if (client.state_ != REGISTERED) {
-    client_not_registered(client);
+   if (!client_registered(client)) {
     return;
   }
   std::string target;
@@ -348,26 +343,31 @@ void MessageHandler::command_MODE(Client& client, std::stringstream& message) {
 void MessageHandler::handle_channel_mode(Client& client, const std::string& channel_name, std::stringstream& message) {
   std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
   if (it == server_.channels_.end()) {
-    // Channel does not exist
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
-
   Channel* channel = it->second;
 
   std::string mode_changes;
   if (!(message >> mode_changes)) {
-    // No mode changes, just return the current mode
-    std::ostringstream oss;
-    oss << "324 " << client.nick_ << " " << channel_name << " +\r\n"; // Simplified, should include actual modes
-    client.add_message_out(oss.str());
-  } 
-  else {
-    // // Apply mode changes
-    // std::ostringstream oss;
-    // oss << ":" << client.nick_ << "!" << client.username_ << "@" << client.hostnamevoid MessageHandler::command_PASSWD(Client& client, std::stringstream& message) {
-    // channel->broadcast(client.fd_, oss.str());
+    std::cout << "current mode " << channel->get_mode() << std::endl;
+    std::string reply = "324 " + client.nick_ + " " + channel_name + " +" + channel->get_mode() + "\r\n";
+    client.add_message_out(reply);
+    return;
   }
+
+  std::cout << "mode changes: " << mode_changes << std::endl;
+  if (mode_changes.empty() || (mode_changes.at(0) != '+' && mode_changes.at(0) != '-')) {
+    // Invalid mode change format, handle the error
+    std::string reply = "461 " + client.nick_ + " " + channel_name + " :Invalid mode change format\r\n";
+    client.add_message_out(reply);
+    return;
+  }
+  channel->set_mode(mode_changes);
+
+  // Apply mode changes
+  std::string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel_name + " " + mode_changes + "\r\n";
+  channel->broadcast(client.fd_, reply);
 }
 // void MessageHandler::handle_user_mode(Client& client, const std::string& target_nick, std::vector<std::string>& arguments) {
 //   std::map<int, Client*>::iterator it = server_.clients_.find(client.fd_);
@@ -400,7 +400,7 @@ void MessageHandler::command_PASS(Client& client, std::stringstream& message) {
   std::string password;
   if (!(message >> password)) {
     REPLY_ERR_NEEDMOREPARAMS(client, "PASS");
-    client_not_registered(client);
+    ERR_NOTREGISTERED(client);
     return;
   }
   if (server_.password_ == password) {
@@ -409,7 +409,7 @@ void MessageHandler::command_PASS(Client& client, std::stringstream& message) {
   else {
     std::string error_message = "464 * :Password incorrect\r\n";
     client.add_message_out(error_message);
-    client_not_registered(client);
+    ERR_NOTREGISTERED(client);
     // server_.epoll_in_out(client.fd_);
   }
 }
@@ -436,7 +436,7 @@ string MessageHandler::extract_message(stringstream& message) {
 
 
 void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
-  if (client.state_ != REGISTERED) {
+  if (!client_registered(client)) {
     return;
   }
   std::string channel_name, target;
@@ -473,10 +473,27 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
 }
 
 void MessageHandler::command_INVITE(Client& client, std::stringstream& message) {
-  if (client.state_ != REGISTERED) {
+  if (!client_registered(client)) {
     return;
   }
   std::string channel_name, target;
+  if (!(message >> channel_name >> target)) {
+    REPLY_ERR_NEEDMOREPARAMS(client, "INVITE");
+    return;
+  }
+  Channel* channel = server_.get_channel(channel_name);
+  if (!channel || (channel_name[0] != '#' && channel_name[0] != '&')) {
+    REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
+    return;
+  }
+  if (!channel->is_on_channel(client.fd_)) {
+    REPLY_ERR_NOTONCHANNEL(client, channel_name);
+    return;
+  }
+  if (!channel->is_operator(client.fd_)) {
+    REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name);
+    return;
+  }
 
 }
 

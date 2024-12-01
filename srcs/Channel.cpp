@@ -1,12 +1,13 @@
 #include "Channel.hpp"
 
+
 using std::string;
 using std::map;
 
 
-Channel::Channel(IrcServ& server, const std::string name, Client& admin) :  server_(server), name_(name) {
-  admins_[admin.fd_] = &admin;
-  clients_[admin.fd_] = &admin;
+Channel::Channel(IrcServ& server, const std::string name, Client& client) :  server_(server), name_(name) {
+  operators_[client.fd_] = &client;
+  clients_[client.fd_] = &client;
 }
 
 Channel::~Channel() {}
@@ -63,16 +64,25 @@ void Channel::add_client(Client& client) {
 }
 
 void Channel::add_operator(Client& client) {
-  admins_[client.fd_] = &client;
+  operators_[client.fd_] = &client;
 }
 
 void Channel::remove_client(int fd) {
   clients_.erase(fd);
-  admins_.erase(fd);
+  operators_.erase(fd);
+}
+
+Client* Channel::get_client(const std::string& name) {
+  for (map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
+    if (it->second->nick_ == name) {
+      return it->second;
+    }
+  }
+  return NULL;
 }
 
 bool Channel::is_operator(int fd) {
-  if (admins_.find(fd) == admins_.end()) {
+  if (operators_.find(fd) == operators_.end()) {
     return false;
   }
   return true;
@@ -86,14 +96,38 @@ bool Channel::is_on_channel(int fd) {
   return true;
 }
 
-Client* Channel::get_client(const std::string& name) {
-  for (map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
-    if (it->second->nick_ == name) {
-      return it->second;
+void Channel::set_mode(const std::string& mode) {
+  bool add_mode = true;
+  for (std::string::const_iterator it = mode.begin(); it != mode.end(); ++it) {
+    char c = *it;
+    if (c == '+') {
+      add_mode = true;
+    } 
+    else if (c == '-') {
+      add_mode = false;
+    } 
+    else {
+      if (add_mode) {
+        modes_.insert(c);
+      } 
+      else {
+        modes_.erase(c);
+      }
     }
   }
-  return NULL;
 }
+
+string Channel::get_mode() {
+  string mode_string;
+  std::set<char>::iterator it = modes_.begin();
+  for (; it != modes_.end(); ++it) {
+    char c = *it;
+    mode_string.push_back(c);
+  }
+  return mode_string;
+}
+
+
 
 
 
