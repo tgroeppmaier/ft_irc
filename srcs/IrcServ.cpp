@@ -3,40 +3,38 @@
 #include <stdio.h>
 #include <sys/epoll.h>
 #include <fcntl.h>
-// #include <cstdlib>
 #include <signal.h>
 #include <netdb.h>
 
 #include "IrcServ.hpp"
 
-using std::string;
-using std::cout;
-using std::cerr;
-using std::endl;
-using std::map;
-
-
+using std::string; using std::cout; using std::endl; using std::map;
 IrcServ* IrcServ::instance_ = NULL;
 
-IrcServ::IrcServ(int port) : 
+IrcServ::IrcServ(int port) :
+  message_handler_(new MessageHandler(*this)),
+  channels_(),
+  clients_to_close(),
+  clients_(),
+  password_(),
+  hostname_(),
   port_(port),
   server_fd_(0),
-  ep_fd_(0),
-  server_addr_(),
-  clients_(),
-  message_handler_(new MessageHandler(*this)) {
+  ep_fd_(0) {
   initializeServerAddr();
   instance_ = this;
 }
 
-IrcServ::IrcServ(int port, string password) :
-  port_(port), 
-  server_fd_(0),
-  ep_fd_(0),
-  password_(password),
-  server_addr_(),
+IrcServ::IrcServ(int port, std::string password) :
+  message_handler_(new MessageHandler(*this)),
+  channels_(),
+  clients_to_close(),
   clients_(),
-  message_handler_(new MessageHandler(*this)) {
+  password_(password),
+  hostname_(),
+  port_(port),
+  server_fd_(0),
+  ep_fd_(0) {
   initializeServerAddr();
   instance_ = this;
 }
@@ -53,6 +51,24 @@ void IrcServ::epoll_in_out(int client_fd) {
     return;
   }
   // cout << "Client fd " << client_fd << " modified to in out Events" << endl;
+}
+
+void IrcServ::epoll_in(int client_fd) {
+  epoll_event ev;
+  ev.events = EPOLLIN; // Listen for both input and output events
+  ev.data.fd = client_fd;
+  if (epoll_ctl(ep_fd_, EPOLL_CTL_MOD, client_fd, &ev) == -1) {
+    perror("Error modifying client socket to include EPOLLOUT");
+    return;
+  }
+  // cout << "Client fd " << client_fd << " modified to in out Events" << endl;
+}
+
+bool IrcServ::check_password(std::string& password) {
+  if (password == password_) {
+    return true;
+  }
+  return false;
 }
 
 void IrcServ::add_to_close(Client* client) {
@@ -160,11 +176,6 @@ void IrcServ::register_signal_handlers() {
       perror("Error registering SIGTERM handler");
       exit(EXIT_FAILURE);
   }
- 
-  // if (sigaction(SIGSEGV, &sa, NULL) == -1) {
-  //     perror("Error registering SIGSEGV handler");
-  //     exit(EXIT_FAILURE);
-  // }
 }
 
 void IrcServ::set_non_block(int sock_fd) {

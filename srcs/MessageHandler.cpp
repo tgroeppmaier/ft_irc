@@ -38,12 +38,7 @@ void MessageHandler::send_messages(Client& client) {
   // }
   if (bytes_sent == static_cast<ssize_t>(length)) { // all messages have been sent
     client.messages_outgoing_.clear();
-    epoll_event ev;
-    ev.events = EPOLLIN; // Listen for input events only
-    ev.data.fd = client.fd_;
-    if (epoll_ctl(server_.ep_fd_, EPOLL_CTL_MOD, client.fd_, &ev) == -1) {
-      perror("Error modifying client socket to include EPOLLOUT");
-    }
+    server_.epoll_in(client.fd_);
   }
   else if (bytes_sent > 0) { // partial send, try again next loop
     client.messages_outgoing_.erase(0, static_cast<size_t>(bytes_sent));
@@ -239,7 +234,6 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
       keys.push_back(token);
     }
   }
-
   // Process each channel
   for (size_t i = 0; i < channels.size(); ++i) {
     std::string channel_name = channels[i];
@@ -252,12 +246,12 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
       REPLY_ERR_TOOMANYCHANNELS(client, channel_name);
       return;
     }
-    std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
-    if (it == server_.channels_.end()) {
+    Channel* channel = server_.get_channel(channel_name);
+    if (channel == NULL) {
       server_.create_channel(channel_name, client);
       return;
-    } 
-    (*it).second->add_client(client);
+    }
+    channel->add_client(client);
   }
 }
 
@@ -321,32 +315,26 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
 }
 
 void MessageHandler::command_MODE(Client& client, std::stringstream& message) {
-   if (!client_registered(client)) {
+  if (!client_registered(client)) {
     return;
   }
-  std::string target;
-  if (!(message >> target)) {
+  std::string channel_name;
+  if (!(message >> channel_name)) {
     REPLY_ERR_NEEDMOREPARAMS(client, "MODE");
     return;
   }
-
-  // Check if the target is a channel or a user
-  if (target[0] == '#' || target[0] == '&') {
-    // Handle channel mode
-    handle_channel_mode(client, target, message);
-  } else {
-    // Handle user mode
-    // (client, target, message);
+  if (channel_name[0] != '#' && channel_name[0] != '&') {
+    // User mode changes are not supported
+    std::string reply = "501 " + client.nick_ + " :User mode changes are not supported\r\n";
+    client.add_message_out(reply);
+    return;     
   }
-}
 
-void MessageHandler::handle_channel_mode(Client& client, const std::string& channel_name, std::stringstream& message) {
-  std::map<std::string, Channel*>::iterator it = server_.channels_.find(channel_name);
-  if (it == server_.channels_.end()) {
+  Channel* channel = server_.get_channel(channel_name);
+  if (!channel) {
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
-  Channel* channel = it->second;
 
   std::string mode_changes;
   if (!(message >> mode_changes)) {
@@ -369,28 +357,6 @@ void MessageHandler::handle_channel_mode(Client& client, const std::string& chan
   std::string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel_name + " " + mode_changes + "\r\n";
   channel->broadcast(client.fd_, reply);
 }
-// void MessageHandler::handle_user_mode(Client& client, const std::string& target_nick, std::vector<std::string>& arguments) {
-//   std::map<int, Client*>::iterator it = server_.clients_.find(client.fd_);
-//   if (it == server.clients_.end() || it->second->nick_ != target_nick) {
-//     // User does not exist or target is not the client itself
-//     std::string message = "502 " + client.nick_ + " :Cannot change mode for other users\r\n";
-//     client.messages_outgoing_.append(message);
-//     return;
-//   }
-
-//   if (arguments.size() == 1) {
-//     // No mode changes, just return the current mode
-//     std::string message = "221 " + client.nick_ + " +\r\n"; // Simplified, should include actual modes
-//     client.messages_outgoing_.append(message);
-//   } else {
-//     // Apply mode changes
-//     // This is a simplified example, actual mode handling would be more complex
-//     std::string mode_changes = arguments[1];
-//     std::string message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + target_nick + " " + mode_changes + "\r\n";
-//     client.messages_outgoing_.append(message);
-//   }
-// }
-
 
 void MessageHandler::command_PASS(Client& client, std::stringstream& message) {
   if (client.state_ != WAITING_FOR_PASS) {
@@ -403,14 +369,13 @@ void MessageHandler::command_PASS(Client& client, std::stringstream& message) {
     ERR_NOTREGISTERED(client);
     return;
   }
-  if (server_.password_ == password) {
+  if (server_.check_password(password)) {
     client.state_ = WAITING_FOR_NICK;
-  } 
+  }
   else {
     std::string error_message = "464 * :Password incorrect\r\n";
     client.add_message_out(error_message);
     ERR_NOTREGISTERED(client);
-    // server_.epoll_in_out(client.fd_);
   }
 }
 
