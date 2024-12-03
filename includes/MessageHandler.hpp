@@ -28,6 +28,7 @@
 
 
 
+
 class IrcServ;
 class Channel;
 class Client;
@@ -59,6 +60,8 @@ private:
   void command_PASS(Client& client, std::stringstream& message);
   void command_KICK(Client& client, std::stringstream& message);
   void command_INVITE(Client& client, std::stringstream& message);
+
+  void reply_TOPIC(Client& client, Channel& channel);
 
 
 public:

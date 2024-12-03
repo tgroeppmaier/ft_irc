@@ -462,3 +462,17 @@ void MessageHandler::command_INVITE(Client& client, std::stringstream& message) 
 
 }
 
+void MessageHandler::reply_TOPIC(Client& client, Channel& channel) {
+  std::string topic = channel.get_topic();
+  std::string reply;
+
+  if (topic.empty()) {
+    // No topic is set
+    reply = "331 " + client.nick_ + " " + channel.get_name() + " :No topic is set\r\n";
+  } else {
+    // Topic is set
+    reply = "332 " + client.nick_ + " " + channel.get_name() + " :" + topic + "\r\n";
+  }
+
+  client.add_message_out(reply);
+}

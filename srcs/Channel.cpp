@@ -27,40 +27,29 @@ void Channel::broadcast(int sender_fd, const std::string& message) {
   for (; it != clients_.end(); ++it) {
     // if (it->first != sender_fd) { // Skip the sender
       it->second->add_message_out(message);
-      // it->second->messages_outgoing_.append(message);
       server_.epoll_in_out(it->first);
     // }
   }
 }
 
 void Channel::add_client(Client& client) {
-  client.add_client_to_channel(name_, this);
+  client.add_channel(name_, this);
   clients_[client.fd_] = &client;
 
   string join_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " JOIN " + name_ + "\r\n";
+  broadcast(client.fd_, join_message);
 
-  // Create and send 353 (RPL_NAMREPLY) message
-  string users;
-  map<int, Client*>::const_iterator it = clients_.begin();
-  for (; it != clients_.end(); ++it) {
-    users += it->second->nick_ + ' ';
-    (*it).second->add_message_out(join_message);
-    server_.epoll_in_out(it->first);
+  std::string reply;
+  reply.reserve(128);
+  if (topic_.empty()) {
+    reply = "331 " + client.nick_ + " " + name_ + " :No topic is set\r\n";
+  } else {
+    reply = "332 " + client.nick_ + " " + name_ + " :" + topic_ + "\r\n";
   }
-  std::string namreply_message = "353 " + client.nick_ + " = " + name_ + " :" + users + "\r\n";
-  client.add_message_out(namreply_message);
-
-  // Create and send 366 (RPL_ENDOFNAMES) message
-  std::string endofnames_message = "366 " + client.nick_ + " " + name_ + " :End of /NAMES list\r\n";
-  client.add_message_out(endofnames_message);
-  
-  // Loop to print out all client nicknames on the channel
-  std::cout << "Clients on channel " << name_ << ": ";
-  for (it = clients_.begin(); it != clients_.end(); ++it) {
-    std::cout << it->second->nick_ << " ";
-  }
-  std::cout << std::endl;  
-
+  string users = get_users();
+  reply += "353 " + client.nick_ + " = " + name_ + " :" + users + "\r\n";
+  reply += "366 " + client.nick_ + " " + name_ + " :End of /NAMES list\r\n";
+  client.add_message_out(reply);
 }
 
 void Channel::add_operator(Client& client) {
@@ -117,6 +106,14 @@ void Channel::set_mode(const std::string& mode) {
   }
 }
 
+void Channel::modify_topic(const std::string& topic) {
+  if (topic.empty()) {
+    topic_.clear();
+  } else {
+    topic_ = topic;
+  }
+}
+
 string Channel::get_mode() {
   string mode_string;
   std::set<char>::iterator it = modes_.begin();
@@ -127,8 +124,25 @@ string Channel::get_mode() {
   return mode_string;
 }
 
+string Channel::get_name() {
+  return name_;
+}
 
+string Channel::get_topic() {
+  return topic_;
+}
 
+std::string Channel::get_users() {
+  std::string users;
+  std::map<int, Client*>::const_iterator it = clients_.begin();
+  for (; it != clients_.end(); ++it) {
+    if (!users.empty()) {
+      users += ' ';
+    }
+    users += it->second->nick_;
+  }
+  return users;
+}
 
 
 

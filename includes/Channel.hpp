@@ -23,6 +23,7 @@ private:
   int user_count_;
   std::string name_;
   std::string password_;
+  std::string topic_;
   std::map<int, Client*> clients_;
   std::map<int, Client*> operators_;
   std::set<char> modes_;
@@ -41,7 +42,11 @@ public:
   bool is_operator(int fd);
   bool is_on_channel(int fd);
   void set_mode(const std::string& modes);
+  void modify_topic(const std::string& modes);
   std::string get_mode();
+  std::string get_name();
+  std::string get_topic();
+  std::string get_users();
   // std::deque<std::pair<int, std::string> > get_users();
 
 };
