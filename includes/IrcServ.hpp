@@ -56,7 +56,7 @@ public:
   bool check_password(std::string& password);
 
   Channel* get_channel(const std::string& name);
-  // Client* get_client(const std::string& name);
+  Client* get_client(const std::string& name);
 
   // IrcServ(const IrcServ &other);
   // IrcServ &operator=(const IrcServ &other);

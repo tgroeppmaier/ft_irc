@@ -20,12 +20,13 @@ class Channel {
 private:
   IrcServ& server_;
   int user_limit_;
-  int user_count_;
+  // int user_count_;
   std::string name_;
-  std::string password_;
+  std::string key_;
   std::string topic_;
   std::map<int, Client*> clients_;
   std::map<int, Client*> operators_;
+  std::set<int> invite_list_;
   std::set<char> modes_;
 
 public:
@@ -37,11 +38,16 @@ public:
   void add_client(Client& client);
   void add_operator(Client& client);
   void remove_client(int fd);
+  void invite_client(Client& inviter, Client& invitee);
   Client* get_client(const std::string& name);
 
   bool is_operator(int fd);
   bool is_on_channel(int fd);
   void set_mode(const std::string& modes);
+  void set_key(const std::string& key);
+  void remove_key();
+  void set_user_limit(int limit);
+  void remove_user_limit();
   void modify_topic(Client& client, const std::string& topic);
   std::string get_mode();
   std::string get_name();

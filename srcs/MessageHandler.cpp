@@ -23,6 +23,7 @@ MessageHandler::MessageHandler(IrcServ& server) : server_(server) {
   command_map_["MODE"] = &MessageHandler::command_MODE;
   command_map_["PRIVMSG"] = &MessageHandler::command_PRIVMSG;
   command_map_["PASS"] = &MessageHandler::command_PASS;
+  command_map_["INVITE"] = &MessageHandler::command_INVITE;
   command_map_["KICK"] = &MessageHandler::command_KICK;
   command_map_["TOPIC"] = &MessageHandler::command_TOPIC;
 }
@@ -383,7 +384,6 @@ void MessageHandler::command_PASS(Client& client, std::stringstream& message) {
 string MessageHandler::extract_message(stringstream& message) {
   std::string message_content;
   std::getline(message, message_content);
-  // message.str().substr(static_cast<std::string::size_type>(message.tellg()));
   if (message_content.empty()) {
     return message_content;
   }
@@ -442,8 +442,8 @@ void MessageHandler::command_INVITE(Client& client, std::stringstream& message) 
   if (!client_registered(client)) {
     return;
   }
-  std::string channel_name, target;
-  if (!(message >> channel_name >> target)) {
+  std::string target, channel_name;
+  if (!(message >> target >> channel_name)) {
     REPLY_ERR_NEEDMOREPARAMS(client, "INVITE");
     return;
   }
@@ -460,7 +460,22 @@ void MessageHandler::command_INVITE(Client& client, std::stringstream& message) 
     REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name);
     return;
   }
+  Client* invitee = server_.get_client(target);
+  if (!invitee) {
+    REPLY_ERR_NOSUCHNICK(client, target);
+    return;
+  }
+  if (channel->is_on_channel(invitee->fd_)) {
+    REPLY_ERR_USERONCHANNEL(client, target, channel->get_name());
+    return;
+  }
+  channel->invite_client(client, *invitee);
+  std::string reply = "341 " + client.nick_ + " " + target + " " + channel_name + "\r\n";
+  client.add_message_out(reply);
+  std::string invite_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " INVITE " + target + " :" + channel_name + "\r\n";
+  invitee->add_message_out(invite_message);
 }
+
 
 void MessageHandler::command_TOPIC(Client& client, std::stringstream& message) {
   if (!client_registered(client)) {
@@ -476,7 +491,10 @@ void MessageHandler::command_TOPIC(Client& client, std::stringstream& message) {
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
-
+  if (!channel->is_on_channel(client.fd_)) {
+    REPLY_ERR_NOTONCHANNEL(client, channel_name);
+    return;
+  }
   std::getline(message >> std::ws, topic);
   if (topic.empty()) {
     topic = channel->get_topic();

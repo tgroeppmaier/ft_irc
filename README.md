@@ -1,5 +1,19 @@
 # ft_irc
 
+## to do
+- [x] KICK command
+- [ ] JOIN 
+- [ ] INVITE
+- [x] TOPIC
+- [ ] MODE
+- [ ] NICK command
+- [ ] nick validation and collision check
+- [ ] user name validation
+- [ ] channel name validation
+- 
+- message parsing / check
+- 
+
 ## Links
 https://ircgod.com/docs/irc/to_know/
 https://github.com/42-serv/ft_irc/wiki
@@ -18,7 +32,7 @@ strace -p 'process num' # see system calls of process
 tcpdump -i lo -X udp port 5100 
 ```
 
-In the context of the provided code snippet, the "queue" refers to the backlog of pending connections that have been accepted by the operating system but not yet processed by the application. Here is a detailed explanation:
+the "queue" refers to the backlog of pending connections that have been accepted by the operating system but not yet processed by the application.
 
 ### Code Snippet
 ```cpp

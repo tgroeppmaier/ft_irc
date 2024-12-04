@@ -95,14 +95,14 @@ Channel* IrcServ::get_channel(const std::string& name) {
   return it->second;
 }
 
-
-// Client* IrcServ::get_client(const std::string& name) {
-//   map<int, Client*>::const_iterator it = clients_.begin();
-//   if ((*it).second->nick_ == name) {
-//     return NULL;
-//   }
-//   return it->second;
-// }
+Client* IrcServ::get_client(const std::string& name) {
+  for (std::map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
+    if (it->second->nick_ == name) {
+      return it->second;
+    }
+  }
+  return NULL;
+}
 
 void IrcServ::create_channel(const std::string& name, Client& client) {
   Channel* channel = new Channel(*this, name, client);

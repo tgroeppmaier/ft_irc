@@ -61,6 +61,12 @@ void Channel::remove_client(int fd) {
   operators_.erase(fd);
 }
 
+void Channel::invite_client(Client& inviter, Client& invitee) {
+  invite_list_.insert(invitee.fd_);
+  string message = ":" + inviter.nick_ + "!" + inviter.username_ + "@" + inviter.hostname_ + " INVITE " + invitee.nick_ + " :" + name_ + "\r\n";
+  broadcast(inviter.fd_, message);
+}
+
 Client* Channel::get_client(const std::string& name) {
   for (map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
     if (it->second->nick_ == name) {
@@ -106,6 +112,22 @@ void Channel::set_mode(const std::string& mode) {
   }
 }
 
+void Channel::set_key(const std::string& key) {
+  key_ = key;
+}
+
+void Channel::remove_key() {
+  key_.clear();
+}
+
+void Channel::set_user_limit(int limit) {
+  user_limit_ = limit;
+}
+
+void Channel::remove_user_limit() {
+  user_limit_ = 0;
+}
+
 void Channel::modify_topic(Client& client, const std::string& topic) {
   std::string reply;
   if (topic.empty()) {
@@ -136,12 +158,15 @@ string Channel::get_topic() {
   return topic_;
 }
 
-std::string Channel::get_users() {
-  std::string users;
+string Channel::get_users() {
+  string users;
   std::map<int, Client*>::const_iterator it = clients_.begin();
   for (; it != clients_.end(); ++it) {
     if (!users.empty()) {
       users += ' ';
+    }
+    if (is_operator(it->second->fd_)) {
+      users += '@';
     }
     users += it->second->nick_;
   }

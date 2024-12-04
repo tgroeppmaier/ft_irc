@@ -8,11 +8,17 @@
 #include "IrcServ.hpp"
 #include <sstream>
 
+#define REPLY_ERR_NOSUCHNICK(client, nick) \
+  client.add_message_out("401 " + client.nick_ + " " + nick + " :No such nick/channel\r\n")
+
 #define REPLY_ERR_NEEDMOREPARAMS(client, command) \
   client.add_message_out("461 " + client.nick_ + " " + command + " :Not enough parameters\r\n")
 
 #define REPLY_ERR_USERNOTINCHANNEL(client, channel) \
   client.add_message_out("441 " + client.nick_ + " " + channel + " :They aren't on that channel\r\n")
+
+#define REPLY_ERR_USERONCHANNEL(client, nick, channel_name) \
+  client.add_message_out("443 " + client.nick_ + " " + nick + " " + channel_name + " :is already on channel\r\n")
 
 #define REPLY_ERR_NOSUCHCHANNEL(client, channel_name) \
   client.add_message_out("403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n")
