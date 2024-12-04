@@ -42,7 +42,7 @@ public:
   bool is_operator(int fd);
   bool is_on_channel(int fd);
   void set_mode(const std::string& modes);
-  void modify_topic(const std::string& modes);
+  void modify_topic(Client& client, const std::string& topic);
   std::string get_mode();
   std::string get_name();
   std::string get_topic();

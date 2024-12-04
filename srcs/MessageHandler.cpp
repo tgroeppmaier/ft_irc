@@ -24,6 +24,7 @@ MessageHandler::MessageHandler(IrcServ& server) : server_(server) {
   command_map_["PRIVMSG"] = &MessageHandler::command_PRIVMSG;
   command_map_["PASS"] = &MessageHandler::command_PASS;
   command_map_["KICK"] = &MessageHandler::command_KICK;
+  command_map_["TOPIC"] = &MessageHandler::command_TOPIC;
 }
 
 MessageHandler::~MessageHandler() {
@@ -459,20 +460,39 @@ void MessageHandler::command_INVITE(Client& client, std::stringstream& message) 
     REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name);
     return;
   }
-
 }
 
-void MessageHandler::reply_TOPIC(Client& client, Channel& channel) {
-  std::string topic = channel.get_topic();
-  std::string reply;
-
-  if (topic.empty()) {
-    // No topic is set
-    reply = "331 " + client.nick_ + " " + channel.get_name() + " :No topic is set\r\n";
-  } else {
-    // Topic is set
-    reply = "332 " + client.nick_ + " " + channel.get_name() + " :" + topic + "\r\n";
+void MessageHandler::command_TOPIC(Client& client, std::stringstream& message) {
+  if (!client_registered(client)) {
+    return;
+  }
+  std::string channel_name, topic;
+  if (!(message >> channel_name)) {
+    REPLY_ERR_NEEDMOREPARAMS(client, "TOPIC");
+    return;
+  }
+  Channel* channel = server_.get_channel(channel_name);
+  if (!channel || (channel_name[0] != '#' && channel_name[0] != '&')) {
+    REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
+    return;
   }
 
-  client.add_message_out(reply);
+  std::getline(message >> std::ws, topic);
+  if (topic.empty()) {
+    topic = channel->get_topic();
+    std::string reply;
+    if (topic.empty()) {
+      reply = "331 " + client.nick_ + " " + channel->get_name() + " :No topic is set\r\n";
+    } else {
+      reply = "332 " + client.nick_ + " " + channel->get_name() + " :" + topic + "\r\n";
+    }
+    client.add_message_out(reply);
+    return;
+  }
+  std::string mode = channel->get_mode();
+  if (mode.find('t') == std::string::npos || channel->is_operator(client.fd_)) {
+    channel->modify_topic(client, topic);
+    return;
+  }
+  REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name);
 }

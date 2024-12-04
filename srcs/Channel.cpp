@@ -106,12 +106,16 @@ void Channel::set_mode(const std::string& mode) {
   }
 }
 
-void Channel::modify_topic(const std::string& topic) {
+void Channel::modify_topic(Client& client, const std::string& topic) {
+  std::string reply;
   if (topic.empty()) {
     topic_.clear();
+    reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " TOPIC " + name_ + " :\r\n";
   } else {
     topic_ = topic;
+    reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " TOPIC " + name_ + " :" + topic + "\r\n";
   }
+  broadcast(client.fd_, reply);
 }
 
 string Channel::get_mode() {
