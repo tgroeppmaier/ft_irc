@@ -32,6 +32,14 @@
 #define REPLY_ERR_TOOMANYCHANNELS(client, channel_name) \
   client.add_message_out("405 " + client.nick_ + " " + channel_name + " :You have joined too many channels\r\n")
 
+#define REPLY_ERR_INVITEONLYCHAN(client, channel_name) \
+  client.add_message_out("473 " + client.nick_ + " " + channel_name + " :Cannot join channel (+i)\r\n")
+
+#define REPLY_ERR_BADCHANNELKEY(client, channel_name) \
+  client.add_message_out("475 " + client.nick_ + " " + channel_name + " :Cannot join channel (+k) - bad key\r\n")
+
+#define REPLY_ERR_CHANNELISFULL(client, channel_name) \
+  client.add_message_out("471 " + client.nick_ + " " + channel_name + " :Cannot join channel (+l) - channel is full\r\n")
 
 class IrcServ;
 class Channel;

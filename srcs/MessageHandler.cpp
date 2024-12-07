@@ -197,52 +197,41 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
   if (!client_registered(client)) {
     return;
   }
-  std::string channels_str;
-  std::string keys_str;
+  std::string channel_name;
+  std::string key;
 
-  // Extract the channels and keys from the message
-  if (!(message >> channels_str)) {
+  if (!(message >> channel_name)) {
     REPLY_ERR_NEEDMOREPARAMS(client, "JOIN");
     return;
   }
-  std::getline(message, keys_str);
-
-  // Split the channels and keys by comma
-  std::vector<std::string> channels;
-  std::vector<std::string> keys;
-  std::stringstream ss_channels(channels_str);
-  std::stringstream ss_keys(keys_str);
-
-  std::string token;
-  while (std::getline(ss_channels, token, ',')) {
-    if (!token.empty()) {
-      channels.push_back(token);
-    }
+  std::getline(message >> std::ws, key);
+  if (channel_name[0] != '#' && channel_name[0] != '&') {
+    REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
+    return;
   }
-  while (std::getline(ss_keys, token, ',')) {
-    if (!token.empty()) {
-      keys.push_back(token);
-    }
+  if (client.chan_limit_reached()) {
+    REPLY_ERR_TOOMANYCHANNELS(client, channel_name);
+    return;
   }
-  // Process each channel
-  for (size_t i = 0; i < channels.size(); ++i) {
-    std::string channel_name = channels[i];
-    if (channel_name[0] != '#' && channel_name[0] != '&') {
-      REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
-      continue;
-    }
-
-    if (client.chan_limit_reached()) {
-      REPLY_ERR_TOOMANYCHANNELS(client, channel_name);
-      return;
-    }
-    Channel* channel = server_.get_channel(channel_name);
-    if (channel == NULL) {
-      server_.create_channel(channel_name, client);
-      return;
-    }
-    channel->add_client(client);
+  Channel* channel = server_.get_channel(channel_name);
+  if (channel == NULL) {
+    server_.create_channel(channel_name, client);
+    return;
   }
+  string mode = channel->get_mode();
+  if (mode.find('i') != string::npos && !channel->is_invited(client.fd_)) {
+    REPLY_ERR_INVITEONLYCHAN(client, channel_name);
+    return;
+  }
+  if (mode.find('k') != string::npos && !channel->check_key(key)) {
+    REPLY_ERR_BADCHANNELKEY(client, channel_name);
+    return;
+  }
+  if (channel->channel_full()) {
+    REPLY_ERR_CHANNELISFULL(client, channel_name);
+    return;
+  }
+  channel->add_client(client);
 }
 
 void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message) {
@@ -367,6 +356,7 @@ void MessageHandler::command_MODE(Client& client, std::stringstream& message) {
             REPLY_ERR_NEEDMOREPARAMS(client, "MODE");
             return;
           }
+          channel->set_mode("k");
           channel->set_key(key);
         } else {
           channel->remove_key();
@@ -392,12 +382,14 @@ void MessageHandler::command_MODE(Client& client, std::stringstream& message) {
         break;
       }
       case 'l': {
-        int limit;
+        ushort limit;
         if (add_mode) {
-          if (!(message >> limit)) {
-            REPLY_ERR_NEEDMOREPARAMS(client, "MODE");
+          if (!(message >> limit || limit > 100)) {
+            std::string reply = "461 " + client.nick_ + " MODE :Invalid user limit\r\n";
+            client.add_message_out(reply);
             return;
           }
+          channel->set_mode("l");
           channel->set_user_limit(limit);
         } else {
           channel->remove_user_limit();
@@ -450,10 +442,6 @@ string MessageHandler::extract_message(stringstream& message) {
   message_content.erase(0, start);
   return message_content;
 }
-
-// KICK #example bob :Spamming is not allowed
-
-
 
 void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
   if (!client_registered(client)) {
@@ -529,8 +517,8 @@ void MessageHandler::command_INVITE(Client& client, std::stringstream& message) 
   client.add_message_out(reply);
   std::string invite_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " INVITE " + target + " :" + channel_name + "\r\n";
   invitee->add_message_out(invite_message);
+  server_.epoll_in_out(invitee->fd_);
 }
-
 
 void MessageHandler::command_TOPIC(Client& client, std::stringstream& message) {
   if (!client_registered(client)) {

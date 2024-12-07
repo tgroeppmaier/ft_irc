@@ -14,13 +14,10 @@
 class Client;
 class IrcServ;
 
-// #define MAX_USERS_PER_CHANNEL 3
-
 class Channel {
 private:
   IrcServ& server_;
-  int user_limit_;
-  // int user_count_;
+  u_short user_limit_;
   std::string name_;
   std::string key_;
   std::string topic_;
@@ -40,6 +37,7 @@ public:
   void add_operator(Client& client);
   void remove_operator(int fd);
   void invite_client(Client& inviter, Client& invitee);
+  bool is_invited(int fd);
   Client* get_client(const std::string& name);
 
   bool is_operator(int fd);
@@ -47,7 +45,9 @@ public:
   void set_mode(const std::string& modes);
   void set_key(const std::string& key);
   void remove_key();
-  void set_user_limit(int limit);
+  bool check_key(const std::string& key);
+  bool channel_full();
+  void set_user_limit(ushort limit);
   void remove_user_limit();
   void modify_topic(Client& client, const std::string& topic);
   std::string get_mode();

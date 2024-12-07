@@ -5,7 +5,7 @@ using std::string;
 using std::map;
 
 
-Channel::Channel(IrcServ& server, const std::string name, Client& client) :  server_(server), name_(name) {
+Channel::Channel(IrcServ& server, const std::string name, Client& client) :  server_(server), user_limit_(100), name_(name) {
   operators_[client.fd_] = &client;
   clients_[client.fd_] = &client;
 }
@@ -71,6 +71,10 @@ void Channel::invite_client(Client& inviter, Client& invitee) {
   broadcast(inviter.fd_, message);
 }
 
+bool Channel::is_invited(int fd) {
+  return invite_list_.find(fd) != invite_list_.end();
+}
+
 Client* Channel::get_client(const std::string& name) {
   for (map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
     if (it->second->nick_ == name) {
@@ -121,10 +125,21 @@ void Channel::set_key(const std::string& key) {
 }
 
 void Channel::remove_key() {
+  modes_.erase('k');
   key_.clear();
 }
 
-void Channel::set_user_limit(int limit) {
+bool Channel::check_key(const std::string& key) {
+  std::cout << "key_ = " << key_ << std::endl;
+  std::cout << "key = " << key << std::endl;
+  return key == key_;
+}
+
+bool Channel::channel_full() {
+  return clients_.size() >= user_limit_;
+}
+
+void Channel::set_user_limit(ushort limit) {
   user_limit_ = limit;
 }
 
