@@ -56,9 +56,13 @@ void Channel::add_operator(Client& client) {
   operators_[client.fd_] = &client;
 }
 
-void Channel::remove_client(int fd) {
-  clients_.erase(fd);
+void Channel::remove_operator(int fd) {
   operators_.erase(fd);
+}
+
+void Channel::remove_client(Client& client) {
+  clients_.erase(client.fd_);
+  operators_.erase(client.fd_);
 }
 
 void Channel::invite_client(Client& inviter, Client& invitee) {

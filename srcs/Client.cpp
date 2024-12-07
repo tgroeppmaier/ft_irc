@@ -42,12 +42,16 @@ void Client::message_to_all_channels(int sender_fd, const std::string& message) 
 void Client::remove_from_all_channels() {
   map<string, Channel*>::iterator it;
   for (it = channels_.begin(); it != channels_.end(); ++it) {
-    (*it).second->remove_client(fd_);
+    (*it).second->remove_client(*this);
   }
 }
 
 void Client::add_channel(const string& name, Channel* channel) {
   channels_[name] = channel;
+}
+
+void Client::remove_channel(const string& name) {
+  channels_.erase(name);
 }
 
 bool Client::chan_limit_reached() {

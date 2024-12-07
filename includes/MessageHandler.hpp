@@ -44,7 +44,6 @@ private:
   std::map<std::string, void(MessageHandler::*)(Client&, std::stringstream&)> command_map_;
 
   void ERR_NOTREGISTERED(Client& client);
-  void handle_channel_mode(Client& client, const std::string& channel_name, std::stringstream& message);
   std::string create_message(Client& client, const std::string& command, const std::string& parameters, const std::string& message);
   std::string extract_message(std::stringstream& message);
   bool client_registered(Client& client);
@@ -65,6 +64,7 @@ private:
   void command_KICK(Client& client, std::stringstream& message);
   void command_INVITE(Client& client, std::stringstream& message);
   void command_TOPIC(Client& client, std::stringstream& message);
+  void command_PART(Client& client, std::stringstream& message);
 
   void reply_TOPIC(Client& client, Channel& channel);
 

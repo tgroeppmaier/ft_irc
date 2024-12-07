@@ -36,8 +36,9 @@ public:
   // void join_message_to_all(Client& client);
   void broadcast(int sender_fd, const std::string& message);
   void add_client(Client& client);
+  void remove_client(Client& client);
   void add_operator(Client& client);
-  void remove_client(int fd);
+  void remove_operator(int fd);
   void invite_client(Client& inviter, Client& invitee);
   Client* get_client(const std::string& name);
 
