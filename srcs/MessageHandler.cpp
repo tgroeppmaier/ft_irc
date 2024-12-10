@@ -101,10 +101,30 @@ void MessageHandler::ERR_NOTREGISTERED(Client& client) {
   server_.add_to_close(&client);
 }
 
-void MessageHandler::command_CAP(Client& client, std::stringstream& /* message */) {
-  if (client.state_ != WAITING_FOR_NICK) {
-    ERR_NOTREGISTERED(client);
-    return;
+void MessageHandler::command_CAP(Client& client, std::stringstream& message) {
+  std::string subcommand;
+  message >> subcommand;
+
+  if (subcommand == "LS") {
+    std::string reply = "CAP * LS :echo-message\r\n";
+    client.add_message_out(reply);
+  } else if (subcommand == "REQ") {
+    std::string capability;
+    message >> capability;
+    if (capability == ":echo-message") { // Check with ":" prefix
+      std::string reply = "CAP * ACK :echo-message\r\n";
+      client.add_message_out(reply);
+    } else {
+      std::string reply = "CAP * NAK :" + capability + "\r\n";
+      client.add_message_out(reply);
+    }
+  } else if (subcommand == "END") {
+    // Optional: Mark capabilities negotiation as complete
+    std::string reply = "CAP * END\r\n";
+    client.add_message_out(reply);
+  } else {
+    std::string reply = "CAP * NAK :" + subcommand + "\r\n";
+    client.add_message_out(reply);
   }
   std::cout << "Handling CAP command for client " << client.fd_ << std::endl;
 }
@@ -115,50 +135,45 @@ void MessageHandler::command_NICK(Client& client, std::stringstream& message) {
     return;
   }
   std::string nick;
-  std::getline(message >> std::ws, nick); // Skip leading whitespace
+  std::getline(message >> std::ws, nick);
   if (nick.empty()) {
     REPLY_ERR_NEEDMOREPARAMS(client, "NICK");
     return;
   }
-  cout << "NICK: " << nick << std::endl;
   if (nick.length() > 9) {
     REPLY_ERR_ERRONEUSNICKNAME(client, nick);
     return;
   }
-  cout << "NICK 1 " << nick << std::endl;
   if (!isalpha(nick[0]) && nick[0] != '[' && nick[0] != ']' && nick[0] != '\\' && nick[0] != '^' && nick[0] != '_' && nick[0] != '{' && nick[0] != '|' && nick[0] != '}') {
     REPLY_ERR_ERRONEUSNICKNAME(client, nick);
     return;
   }
-  cout << "NICK 2 " << nick << std::endl;
   for (size_t i = 1; i < nick.length(); ++i) {
     if (!isalnum(nick[i]) && nick[i] != '-' && nick[i] != '[' && nick[i] != ']' && nick[i] != '\\' && nick[i] != '^' && nick[i] != '_' && nick[i] != '{' && nick[i] != '|' && nick[i] != '}') {
       REPLY_ERR_ERRONEUSNICKNAME(client, nick);
       return;
     }
   }
-  cout << "NICK 3 " << nick << std::endl;
   if (!server_.check_nick(nick)) {
     std::string reply = "433 " + client.nick_ + " " + nick + " :Nickname is already in use\r\n";
     client.add_message_out(reply);
     return;
   }
 
-  if (client.state_ == REGISTERED) {
-    std::string nick_reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " NICK :" + nick + "\r\n";
-    client.broadcast_all_channels(nick_reply);
-    client.nick_ = nick;
-    return;
-  }
-  client.nick_ = nick;
-  client.state_ = WAITING_FOR_USER;
+  // Send NICK reply to all clients in the same channels
+  std::string nick_reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " NICK :" + nick + "\r\n";
+  client.broadcast_all_channels(nick_reply);
 
+  client.nick_ = nick;
+  if (client.state_ == WAITING_FOR_NICK) {
+    client.state_ = WAITING_FOR_USER;
+  }
   std::cout << "Handling NICK command for client " << client.nick_ << std::endl;
 }
 
 void MessageHandler::command_USER(Client& client, std::stringstream& message) {
   if (client.state_ == REGISTERED) {
-    std::string reply = "462 " + client.nick_ + " :You may not reregister\r\n";
+    string reply = "462 " + client.nick_ + " :You may not reregister\r\n";
     client.add_message_out(reply);
     return;
   }
@@ -166,7 +181,7 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
     ERR_NOTREGISTERED(client);
     return;
   }
-  std::string username, user_mode, hostname, realname;
+  string username, user_mode, hostname, realname;
   if (!std::getline(message >> std::ws, username, ' ') || username.empty()) {
     REPLY_ERR_NEEDMOREPARAMS(client, "USER");
     return;
@@ -213,7 +228,7 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
   client.state_ = REGISTERED;
   client.username_ = username;
   client.realname_ = realname;
-  std::string reply;
+  string reply;
   reply.reserve(128);
   reply += "001 " + client.nick_ + " :Welcome to the IRC server\r\n";
   reply += "002 " + client.nick_ + " :Your host is " + inet_ntoa(server_.server_addr_.sin_addr) + ", running version 1.0\r\n";
@@ -302,7 +317,9 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
     return;
   }
   // Extract the remaining message content from the current position
-  string message_content = message.str().substr(static_cast<string::size_type>(message.tellg()));
+  string message_content;
+  // string message_content = message.str().substr(static_cast<string::size_type>(message.tellg()));
+  std::getline(message >> std::ws, message_content);
   if (message_content.empty()) {
     REPLY_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
     return;
