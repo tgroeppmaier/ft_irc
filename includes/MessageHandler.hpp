@@ -41,6 +41,9 @@
 #define REPLY_ERR_CHANNELISFULL(client, channel_name) \
   client.add_message_out("471 " + client.nick_ + " " + channel_name + " :Cannot join channel (+l) - channel is full\r\n")
 
+#define REPLY_ERR_ERRONEUSNICKNAME(client, nick) \
+  client.add_message_out("432 " + client.nick_ + " " + nick + " :Erroneous nickname\r\n")
+
 class IrcServ;
 class Channel;
 class Client;

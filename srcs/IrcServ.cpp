@@ -71,6 +71,17 @@ bool IrcServ::check_password(std::string& password) {
   return false;
 }
 
+bool IrcServ::check_nick(std::string& nick) {
+  map<int, Client*>::const_iterator it;
+  for (it = clients_.begin(); it != clients_.end(); ++it) {
+    if (it->second->nick_ == nick) {
+      return false;
+    }
+  }
+  return true;
+}
+
+
 void IrcServ::add_to_close(Client* client) {
   clients_to_close.insert(client);
 }

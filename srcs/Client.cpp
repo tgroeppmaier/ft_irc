@@ -46,6 +46,12 @@ void Client::remove_from_all_channels() {
   }
 }
 
+void Client::broadcast_all_channels(const std::string& message) {
+  for (std::map<std::string, Channel*>::iterator it = channels_.begin(); it != channels_.end(); ++it) {
+    it->second->broadcast(fd_, message);
+  }
+}
+
 void Client::add_channel(const string& name, Channel* channel) {
   channels_[name] = channel;
 }

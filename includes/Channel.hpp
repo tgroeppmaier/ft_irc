@@ -54,8 +54,6 @@ public:
   std::string get_name();
   std::string get_topic();
   std::string get_users();
-  // std::deque<std::pair<int, std::string> > get_users();
-
 };
 
 #endif

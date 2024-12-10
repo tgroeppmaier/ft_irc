@@ -130,8 +130,6 @@ void Channel::remove_key() {
 }
 
 bool Channel::check_key(const std::string& key) {
-  std::cout << "key_ = " << key_ << std::endl;
-  std::cout << "key = " << key << std::endl;
   return key == key_;
 }
 
