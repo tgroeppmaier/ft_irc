@@ -154,7 +154,10 @@ void IrcServ::delete_client(int client_fd) {
   if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
     perror("Error removing client socket from epoll");
   }
-  
+  map<string, Channel*>::iterator it = channels_.begin();
+  for (; it != channels_.end(); ++it) {
+    (*it).second->remove_client_invite_list(client_fd);
+  }
   delete clients_[client_fd];
   clients_.erase(client_fd);
 }
@@ -228,7 +231,7 @@ bool IrcServ::add_fd_to_epoll(int fd) {
 void IrcServ::start() {
   register_signal_handlers();
   server_fd_ = socket(AF_INET, SOCK_STREAM, 0);
-  if (server_fd_ == -1) {
+  if (server_fd_ == -1) { 
     perror("Error. Failed to create socket");
     exit(EXIT_FAILURE);
   }

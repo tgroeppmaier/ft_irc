@@ -34,6 +34,7 @@ public:
   void broadcast(int sender_fd, const std::string& message);
   void add_client(Client& client);
   void remove_client(Client& client);
+  void remove_client_invite_list(int fd);
   void add_operator(Client& client);
   void remove_operator(int fd);
   void invite_client(Client& inviter, Client& invitee);

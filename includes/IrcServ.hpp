@@ -40,7 +40,6 @@ private:
   void register_signal_handlers();
   void event_loop();
 
-
 public:
   sockaddr_in server_addr_;
 

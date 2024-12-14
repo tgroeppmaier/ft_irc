@@ -36,6 +36,7 @@ void Channel::broadcast(int sender_fd, const std::string& message) {
 void Channel::add_client(Client& client) {
   client.add_channel(name_, this);
   clients_[client.fd_] = &client;
+  invite_list_.erase(client.fd_);
 
   string join_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " JOIN " + name_ + "\r\n";
   broadcast(client.fd_, join_message);
@@ -64,6 +65,11 @@ void Channel::remove_operator(int fd) {
 void Channel::remove_client(Client& client) {
   clients_.erase(client.fd_);
   operators_.erase(client.fd_);
+  invite_list_.erase(client.fd_);
+}
+
+void Channel::remove_client_invite_list(int fd) {
+  invite_list_.erase(fd);
 }
 
 void Channel::invite_client(Client& inviter, Client& invitee) {
@@ -95,7 +101,12 @@ bool Channel::is_operator(int fd) {
 
 bool Channel::is_on_channel(int fd) {
   if (clients_.find(fd) == clients_.end()) {
-    std::cout << "is not on channel" << std::endl;
+    // std::cout << "is not on channel" << std::endl;
+    // std::cout << "client fd: " << fd << std::endl;
+    // std::cout << "All client fds on this channel:" << std::endl;
+    // for (std::map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
+    //   std::cout << it->first << std::endl;
+    // }
     return false;
   }
   return true;
