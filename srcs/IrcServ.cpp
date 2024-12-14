@@ -73,19 +73,17 @@ bool IrcServ::check_password(std::string& password) {
   return false;
 }
 
-
-// Helper function to convert a string to lowercase
-std::string to_lower(const std::string& str) {
-  std::string lower_str = str;
-  std::transform(lower_str.begin(), lower_str.end(), lower_str.begin(), ::tolower);
-  return lower_str;
+string IrcServ::to_upper(const std::string& str) {
+  std::string upper_str = str;
+  std::transform(upper_str.begin(), upper_str.end(), upper_str.begin(), ::toupper);
+  return upper_str;
 }
 
 bool IrcServ::check_nick(std::string& nick) {
-  std::string lower_nick = to_lower(nick);
+  std::string upper_nick = to_upper(nick);
   std::map<int, Client*>::const_iterator it;
   for (it = clients_.begin(); it != clients_.end(); ++it) {
-    if (to_lower(it->second->nick_) == lower_nick) {
+    if (to_upper(it->second->nick_) == upper_nick) {
       return false;
     }
   }
@@ -105,13 +103,12 @@ void IrcServ::cleanup_clients() {
     delete_client((*it)->fd_);
   }
   clients_to_close.clear();
-  
 }
 
 Channel* IrcServ::get_channel(const std::string& name) {
-  std::string lower_name = to_lower(name);
+  std::string lower_name = to_upper(name);
   for (std::map<const std::string, Channel*>::const_iterator it = channels_.begin(); it != channels_.end(); ++it) {
-    if (to_lower(it->first) == lower_name) {
+    if (to_upper(it->first) == lower_name) {
       return it->second;
     }
   }
@@ -119,9 +116,9 @@ Channel* IrcServ::get_channel(const std::string& name) {
 }
 
 Client* IrcServ::get_client(const std::string& name) {
-  std::string lower_name = to_lower(name);
+  std::string lower_name = to_upper(name);
   for (std::map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
-    if (to_lower(it->second->nick_) == lower_name) {
+    if (to_upper(it->second->nick_) == lower_name) {
       return it->second;
     }
   }

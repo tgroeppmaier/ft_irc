@@ -54,13 +54,6 @@ void MessageHandler::send_messages(Client& client) {
   }
 }
 
-// Helper function to convert a string to uppercase
-std::string to_upper(const std::string& str) {
-  std::string upper_str = str;
-  std::transform(upper_str.begin(), upper_str.end(), upper_str.begin(), ::toupper);
-  return upper_str;
-}
-
 void MessageHandler::process_incoming_messages(Client& client) {
   size_t start = 0;
   size_t end = 0;
@@ -74,7 +67,7 @@ void MessageHandler::process_incoming_messages(Client& client) {
       std::cerr << "Error extracting command" << std::endl;
       return;
     }
-    command = to_upper(command);
+    command = server_.to_upper(command);
     map<string, void(MessageHandler::*)(Client&, stringstream&)>::const_iterator cmd_it = command_map_.find(command);
     if (cmd_it != command_map_.end()) {
         (this->*(cmd_it->second))(client, ss);
@@ -91,11 +84,6 @@ void MessageHandler::process_incoming_messages(Client& client) {
   // cout << client.messages_outgoing_ << std::endl; // DEBUG
 }
 
-string MessageHandler::create_message(Client& client, const string& command, const string& parameters, const string& message_content) {
-  string message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " " + command + " " + parameters + " :" + message_content + "\r\n";
-  return message;
-}
-
 bool MessageHandler::client_registered(Client& client) {
   if (client.state_ != REGISTERED) {
     ERR_NOTREGISTERED(client);
@@ -103,7 +91,6 @@ bool MessageHandler::client_registered(Client& client) {
   }
   return true;
 }
-
 
 void MessageHandler::ERR_NOTREGISTERED(Client& client) {
   string message = "451 * :You have not registered\r\n";
@@ -121,7 +108,7 @@ void MessageHandler::command_CAP(Client& client, std::stringstream& message) {
   } else if (subcommand == "REQ") {
     std::string capability;
     message >> capability;
-    if (capability == ":echo-message") { // Check with ":" prefix
+    if (capability == ":echo-message") {
       std::string reply = "CAP * ACK :echo-message\r\n";
       client.add_message_out(reply);
     } else {
@@ -282,7 +269,7 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
     return;
   }
   std::getline(message >> std::ws, key);
-  if (channel_name[0] != '#' && channel_name[0] != '&') {
+  if (channel_name[0] != '#') { // Only support local channels prefixed with '#'
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
@@ -331,7 +318,7 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
   }
   if (target[0] == '#' || target[0] == '&') {
     Channel* channel = server_.get_channel(target);
-    if (channel == NULL) {
+    if (target[0] == '&' || channel == NULL) {
       REPLY_ERR_NOSUCHCHANNEL(sender, target);
       return;
     }
@@ -348,8 +335,6 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
       REPLY_ERR_NOSUCHNICK(sender, target);
       return;
     }
-    // cout << "Target: " << target << std::endl;
-    // cout << "Target Nick: " << target_client->nick_ << std::endl;
     string full_message = ":" + sender.nick_ + "!" + sender.username_ + "@" + sender.hostname_ + " PRIVMSG " + target_client->nick_ + " :" + message_content + "\r\n";
     sender.add_message_out(full_message);
     target_client->add_message_out(full_message);
@@ -496,8 +481,6 @@ string MessageHandler::extract_message(stringstream& message) {
   if (message_content.empty()) {
     return message_content;
   }
-
-  // Remove leading whitespace and leading ':' if present
   size_t start = 0;
   while (start < message_content.size() && (message_content[start] == ' ' || message_content[start] == ':')) {
     ++start;
@@ -516,7 +499,7 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
     return;
   }
   Channel* channel = server_.get_channel(channel_name);
-  if (!channel || (channel_name[0] != '#' && channel_name[0] != '&')) {
+  if (!channel || (channel_name[0] != '#')) {
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
@@ -537,8 +520,7 @@ void MessageHandler::command_KICK(Client& client, std::stringstream& message) {
   if (message_content.empty()) {
     message_content = "No reason specified";
   }
-  string parameters = channel_name + " " + target;
-  string reply = create_message(client, "KICK", parameters, message_content);
+  string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " KICK " + channel_name + " " + target + " :" + message_content + "\r\n";
   channel->broadcast(client.fd_, reply);
   channel->remove_client(client);
   client.remove_channel(channel->get_name());
@@ -554,7 +536,7 @@ void MessageHandler::command_INVITE(Client& client, std::stringstream& message) 
     return;
   }
   Channel* channel = server_.get_channel(channel_name);
-  if (!channel || (channel_name[0] != '#' && channel_name[0] != '&')) {
+  if (!channel || (channel_name[0] != '#')) {
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
@@ -593,7 +575,7 @@ void MessageHandler::command_TOPIC(Client& client, std::stringstream& message) {
     return;
   }
   Channel* channel = server_.get_channel(channel_name);
-  if (!channel || (channel_name[0] != '#' && channel_name[0] != '&')) {
+  if (!channel || (channel_name[0] != '#')) {
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }
@@ -631,7 +613,7 @@ void MessageHandler::command_PART(Client& client, std::stringstream& message) {
     return;
   }
   Channel* channel = server_.get_channel(channel_name);
-  if (!channel || (channel_name[0] != '#' && channel_name[0] != '&')) {
+  if (!channel || (channel_name[0] != '#')) {
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
   }

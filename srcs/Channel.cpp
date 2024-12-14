@@ -1,5 +1,6 @@
 #include "Channel.hpp"
-
+#include <algorithm>
+#include <cctype>
 
 using std::string;
 using std::map;
@@ -76,8 +77,9 @@ bool Channel::is_invited(int fd) {
 }
 
 Client* Channel::get_client(const std::string& name) {
-  for (map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
-    if (it->second->nick_ == name) {
+  std::string upper_name = server_.to_upper(name);
+  for (std::map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
+    if (server_.to_upper(it->second->nick_) == upper_name) {
       return it->second;
     }
   }

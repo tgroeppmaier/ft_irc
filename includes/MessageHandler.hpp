@@ -61,7 +61,6 @@ private:
   std::map<std::string, void(MessageHandler::*)(Client&, std::stringstream&)> command_map_;
 
   void ERR_NOTREGISTERED(Client& client);
-  std::string create_message(Client& client, const std::string& command, const std::string& parameters, const std::string& message);
   std::string extract_message(std::stringstream& message);
   bool client_registered(Client& client);
   

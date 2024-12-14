@@ -48,6 +48,7 @@ public:
   IrcServ(int port, std::string password);
   ~IrcServ();
   void close_socket(int fd);
+  std::string to_upper(const std::string& str);
   void delete_client(int fd);
   void add_to_close(Client* client);
   void create_channel(const std::string& name, Client& admin);
