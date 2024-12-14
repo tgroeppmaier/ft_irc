@@ -76,6 +76,7 @@ void MessageHandler::process_incoming_messages(Client& client) {
   }
   client.messages_incoming_.erase(0, start);
   server_.epoll_in_out(client.fd_);
+  // cout << client.messages_outgoing_ << std::endl; // DEBUG
 }
 
 bool MessageHandler::client_registered(Client& client) {
@@ -418,8 +419,12 @@ void MessageHandler::command_MODE(Client& client, stringstream& message) {
         }
         if (add_mode) {
           channel->add_operator(*target);
+          std::string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel->get_name() + " +o " + target->nick_ + "\r\n";
+          channel->broadcast(client.fd_, reply);
         } else {
           channel->remove_operator(target->fd_);
+          std::string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel->get_name() + " -o " + target->nick_ + "\r\n";
+          channel->broadcast(client.fd_, reply);
         }
         break;
       }
@@ -516,8 +521,8 @@ void MessageHandler::command_KICK(Client& client, stringstream& message) {
   }
   string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " KICK " + channel_name + " " + target + " :" + message_content + "\r\n";
   channel->broadcast(client.fd_, reply);
-  channel->remove_client(client);
-  client.remove_channel(channel->get_name());
+  channel->remove_client(*client_to_kick);
+  client_to_kick->remove_channel(channel->get_name());
 }
 
 void MessageHandler::command_INVITE(Client& client, stringstream& message) {
