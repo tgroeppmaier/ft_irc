@@ -1,5 +1,7 @@
 #include <arpa/inet.h>
 #include <cstring>
+#include <algorithm>
+#include <cctype>
 #include <stdio.h>
 #include <sys/epoll.h>
 #include <fcntl.h>
@@ -71,16 +73,24 @@ bool IrcServ::check_password(std::string& password) {
   return false;
 }
 
+
+// Helper function to convert a string to lowercase
+std::string to_lower(const std::string& str) {
+  std::string lower_str = str;
+  std::transform(lower_str.begin(), lower_str.end(), lower_str.begin(), ::tolower);
+  return lower_str;
+}
+
 bool IrcServ::check_nick(std::string& nick) {
-  map<int, Client*>::const_iterator it;
+  std::string lower_nick = to_lower(nick);
+  std::map<int, Client*>::const_iterator it;
   for (it = clients_.begin(); it != clients_.end(); ++it) {
-    if (it->second->nick_ == nick) {
+    if (to_lower(it->second->nick_) == lower_nick) {
       return false;
     }
   }
   return true;
 }
-
 
 void IrcServ::add_to_close(Client* client) {
   clients_to_close.insert(client);
@@ -99,16 +109,19 @@ void IrcServ::cleanup_clients() {
 }
 
 Channel* IrcServ::get_channel(const std::string& name) {
-  map<const string, Channel*>::const_iterator it = channels_.find(name);
-  if (it == channels_.end()) {
-    return NULL;
+  std::string lower_name = to_lower(name);
+  for (std::map<const std::string, Channel*>::const_iterator it = channels_.begin(); it != channels_.end(); ++it) {
+    if (to_lower(it->first) == lower_name) {
+      return it->second;
+    }
   }
-  return it->second;
+  return NULL;
 }
 
 Client* IrcServ::get_client(const std::string& name) {
+  std::string lower_name = to_lower(name);
   for (std::map<int, Client*>::const_iterator it = clients_.begin(); it != clients_.end(); ++it) {
-    if (it->second->nick_ == name) {
+    if (to_lower(it->second->nick_) == lower_name) {
       return it->second;
     }
   }
@@ -150,10 +163,8 @@ void IrcServ::delete_client(int client_fd) {
 }
 
 void IrcServ::cleanup() {
-  cout << "######################KILLED BY SIGNAL#############################" << endl;
   close_socket(server_fd_);
   close_socket(ep_fd_);
-
   // Close and delete all client connections
   std::vector<int> client_fds;
   for (std::map<int, Client*>::iterator it = clients_.begin(); it != clients_.end(); ++it) {
@@ -163,12 +174,10 @@ void IrcServ::cleanup() {
     delete_client(*it);
   }
   clients_.clear();
-
   for (std::map<string, Channel*>::iterator it = channels_.begin(); it != channels_.end(); ++it) {
     delete it->second;
   }
   channels_.clear();
-
   delete message_handler_;
 }
 

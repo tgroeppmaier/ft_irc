@@ -11,26 +11,35 @@
 #define REPLY_ERR_NOSUCHNICK(client, nick) \
   client.add_message_out("401 " + client.nick_ + " " + nick + " :No such nick/channel\r\n")
 
-#define REPLY_ERR_NEEDMOREPARAMS(client, command) \
-  client.add_message_out("461 " + client.nick_ + " " + command + " :Not enough parameters\r\n")
+#define REPLY_ERR_NOSUCHCHANNEL(client, channel_name) \
+  client.add_message_out("403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n")
+
+#define REPLY_ERR_TOOMANYCHANNELS(client, channel_name) \
+  client.add_message_out("405 " + client.nick_ + " " + channel_name + " :You have joined too many channels\r\n")
+
+#define REPLY_ERR_NORECIPIENT(client, command) \
+  client.add_message_out("411 " + client.nick_ + " :No recipient given (" + command + ")\r\n")
+
+#define REPLY_ERR_NOTEXTTOSEND(client) \
+  client.add_message_out("412 " + client.nick_ + " :No text to send\r\n")
+
+#define REPLY_ERR_ERRONEUSNICKNAME(client, nick) \
+  client.add_message_out("432 " + client.nick_ + " " + nick + " :Erroneous nickname\r\n")
 
 #define REPLY_ERR_USERNOTINCHANNEL(client, channel) \
   client.add_message_out("441 " + client.nick_ + " " + channel + " :They aren't on that channel\r\n")
 
-#define REPLY_ERR_USERONCHANNEL(client, nick, channel_name) \
-  client.add_message_out("443 " + client.nick_ + " " + nick + " " + channel_name + " :is already on channel\r\n")
-
-#define REPLY_ERR_NOSUCHCHANNEL(client, channel_name) \
-  client.add_message_out("403 " + client.nick_ + " " + channel_name + " :Invalid channel name\r\n")
-
-#define REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name) \
-  client.add_message_out("482 " + client.nick_ + " " + channel_name + " :You're not channel operator\r\n")
-
 #define REPLY_ERR_NOTONCHANNEL(client, channel_name) \
   client.add_message_out("442 " + client.nick_ + " " + channel_name + " :You're not on that channel\r\n")
 
-#define REPLY_ERR_TOOMANYCHANNELS(client, channel_name) \
-  client.add_message_out("405 " + client.nick_ + " " + channel_name + " :You have joined too many channels\r\n")
+#define REPLY_ERR_USERONCHANNEL(client, nick, channel_name) \
+  client.add_message_out("443 " + client.nick_ + " " + nick + " " + channel_name + " :is already on channel\r\n")
+
+#define REPLY_ERR_NEEDMOREPARAMS(client, command) \
+  client.add_message_out("461 " + client.nick_ + " " + command + " :Not enough parameters\r\n")
+
+#define REPLY_ERR_CHANNELISFULL(client, channel_name) \
+  client.add_message_out("471 " + client.nick_ + " " + channel_name + " :Cannot join channel (+l) - channel is full\r\n")
 
 #define REPLY_ERR_INVITEONLYCHAN(client, channel_name) \
   client.add_message_out("473 " + client.nick_ + " " + channel_name + " :Cannot join channel (+i)\r\n")
@@ -38,11 +47,8 @@
 #define REPLY_ERR_BADCHANNELKEY(client, channel_name) \
   client.add_message_out("475 " + client.nick_ + " " + channel_name + " :Cannot join channel (+k) - bad key\r\n")
 
-#define REPLY_ERR_CHANNELISFULL(client, channel_name) \
-  client.add_message_out("471 " + client.nick_ + " " + channel_name + " :Cannot join channel (+l) - channel is full\r\n")
-
-#define REPLY_ERR_ERRONEUSNICKNAME(client, nick) \
-  client.add_message_out("432 " + client.nick_ + " " + nick + " :Erroneous nickname\r\n")
+#define REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name) \
+  client.add_message_out("482 " + client.nick_ + " " + channel_name + " :You're not channel operator\r\n")
 
 class IrcServ;
 class Channel;
@@ -59,9 +65,6 @@ private:
   std::string extract_message(std::stringstream& message);
   bool client_registered(Client& client);
   
-  
-  // void handle_user_mode(Client& client, const std::string& target_nick, std::vector<std::string>& arguments);
-
   // Command handling functions
   void command_CAP(Client& client, std::stringstream& message);
   void command_NICK(Client& client, std::stringstream& message);

@@ -12,16 +12,34 @@
 - [ ] channel name validation
 - 
 - message parsing / check
-- 
+
+## Weechat Commands
+
+- **Start with different home folder**: `weechat --dir /path/to/folder`
+- **Set options**: `/set`
+- **Add server**: `/server add <server_name> <server_address>/<port>`
+  - Example: `/server add ftirc 127.0.0.1/6667`
+- **Set server options**:
+  - Disable TLS: `/set irc.server.<server_name>.tls off`
+  - Set username: `/set irc.server.<server_name>.username "My user name"`
+  - Set real name: `/set irc.server.<server_name>.realname "My real name"`
+  - Set nicknames: `/set irc.server_default.nicks "name"`
+  - Disable anti-flood: `/set irc.server.<server_name>.anti_flood_prio_low 0`
+  - Disable default anti-flood: `/set irc.server_default.anti_flood 0`
+- **Send private message**: `/msg #channel message`
+- **Show raw command**: `/server raw`
+- **Switch channel / Buffer**: `F5`
+- **List servers**: `/server list`
 
 ## Links
-https://ircgod.com/docs/irc/to_know/
-https://github.com/42-serv/ft_irc/wiki
-https://expserver.github.io/guides/resources/introduction-to-linux-epoll.html
-https://medium.com/@avocadi/what-is-epoll-9bbc74272f7c
+
+- [IRC Protocol Documentation](https://ircgod.com/docs/irc/to_know/)
+- [ft_irc Wiki](https://github.com/42-serv/ft_irc/wiki)
+- [Introduction to Linux epoll](https://expserver.github.io/guides/resources/introduction-to-linux-epoll.html)
+- [What is epoll?](https://medium.com/@avocadi/what-is-epoll-9bbc74272f7c)
 
 
-## useful commands
+## useful shell commands
 
 ``` bash
 ps auxf
@@ -32,7 +50,6 @@ strace -p 'process num' # see system calls of process
 tcpdump -i lo -X udp port 5100 
 ```
 
-the "queue" refers to the backlog of pending connections that have been accepted by the operating system but not yet processed by the application.
 
 ### Code Snippet
 ```cpp

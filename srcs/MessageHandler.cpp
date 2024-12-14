@@ -5,6 +5,8 @@
 #include <string>
 #include <arpa/inet.h> // For inet_ntoa
 
+#include <algorithm>
+#include <cctype>
 
 using std::vector;
 using std::string;
@@ -52,6 +54,13 @@ void MessageHandler::send_messages(Client& client) {
   }
 }
 
+// Helper function to convert a string to uppercase
+std::string to_upper(const std::string& str) {
+  std::string upper_str = str;
+  std::transform(upper_str.begin(), upper_str.end(), upper_str.begin(), ::toupper);
+  return upper_str;
+}
+
 void MessageHandler::process_incoming_messages(Client& client) {
   size_t start = 0;
   size_t end = 0;
@@ -65,6 +74,7 @@ void MessageHandler::process_incoming_messages(Client& client) {
       std::cerr << "Error extracting command" << std::endl;
       return;
     }
+    command = to_upper(command);
     map<string, void(MessageHandler::*)(Client&, stringstream&)>::const_iterator cmd_it = command_map_.find(command);
     if (cmd_it != command_map_.end()) {
         (this->*(cmd_it->second))(client, ss);
@@ -159,8 +169,6 @@ void MessageHandler::command_NICK(Client& client, std::stringstream& message) {
     client.add_message_out(reply);
     return;
   }
-
-  // Send NICK reply to all clients in the same channels
   std::string nick_reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " NICK :" + nick + "\r\n";
   client.broadcast_all_channels(nick_reply);
 
@@ -234,7 +242,6 @@ void MessageHandler::command_USER(Client& client, std::stringstream& message) {
   reply += "002 " + client.nick_ + " :Your host is " + inet_ntoa(server_.server_addr_.sin_addr) + ", running version 1.0\r\n";
   reply += "003 " + client.nick_ + " :This server was created today\r\n";
   reply += "004 " + client.nick_ + " " + inet_ntoa(server_.server_addr_.sin_addr) + " 1.0 o o\r\n";
-  reply += "005 " + client.nick_ + " :Some additional information\r\n";
   client.add_message_out(reply);
   std::cout << "Handling USER command for client " << client.username_ << std::endl;
 }
@@ -255,12 +262,10 @@ void MessageHandler::command_PING(Client& client, std::stringstream& message) {
 
 void MessageHandler::command_QUIT(Client& client, std::stringstream& message) {
   std::string quit_message;
-  std::getline(message >> std::ws, quit_message); // skip initial whitespace
-
+  std::getline(message >> std::ws, quit_message);
   if (!quit_message.empty() && quit_message[0] == ':') {
     quit_message.erase(0, 1);
   }
-
   std::string broadcast_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " QUIT :" + quit_message + "\r\n";
   client.message_to_all_channels(client.fd_, broadcast_message);
   server_.delete_client(client.fd_);
@@ -272,7 +277,6 @@ void MessageHandler::command_JOIN(Client& client, std::stringstream& message) {
   }
   string channel_name;
   string key;
-
   if (!(message >> channel_name)) {
     REPLY_ERR_NEEDMOREPARAMS(client, "JOIN");
     return;
@@ -313,58 +317,43 @@ void MessageHandler::command_PRIVMSG(Client& sender, std::stringstream& message)
   }
   string target;
   if (!(message >> target)) {
-    REPLY_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
+    REPLY_ERR_NORECIPIENT(sender, "PRIVMSG");
     return;
   }
-  // Extract the remaining message content from the current position
   string message_content;
-  // string message_content = message.str().substr(static_cast<string::size_type>(message.tellg()));
   std::getline(message >> std::ws, message_content);
   if (message_content.empty()) {
-    REPLY_ERR_NEEDMOREPARAMS(sender, "PRIVMSG");
+    REPLY_ERR_NOTEXTTOSEND(sender);
     return;
   }
-
-  // Remove leading whitespace and leading ':' if present
-  size_t start = 0;
-  while (start < message_content.size() && (message_content[start] == ' ' || message_content[start] == ':')) {
-    ++start;
+  if (!message_content.empty() && message_content[0] == ':') {
+    message_content.erase(0, 1);
   }
-  message_content.erase(0, start);
-
-  // Target is a channel
   if (target[0] == '#' || target[0] == '&') {
     Channel* channel = server_.get_channel(target);
     if (channel == NULL) {
       REPLY_ERR_NOSUCHCHANNEL(sender, target);
       return;
     }
-
-  if (!(channel->is_on_channel(sender.fd_))) {
-    REPLY_ERR_USERNOTINCHANNEL(sender, target);
-    return;
-  }
-  std::ostringstream oss;
-  oss << ":" << sender.nick_ << "!" << sender.username_ << "@" << sender.hostname_ << " PRIVMSG " << target << " :" << message_content << "\r\n";
-  channel->broadcast(sender.fd_, oss.str());
-  } else {
-    // Handle sending message to a user
-    // Client* target_client = server_.get_client_by_nick(target);
-    // if (target_client == NULL) {
-    //   std::ostringstream oss;
-    //   oss << "401 " << sender.nick_ << " " << target << " :No such nick/channel\r\n";
-    //   sender.messages_outgoing_.append(oss.str());
-    //   server_.epoll_in_out(sender.fd_);
-    //   return;
-    // }
-
-    // // Construct the PRIVMSG message
-    // std::ostringstream oss;
-    // oss << ":" << sender.nick_ << "!" << sender.username_ << "@" << sender.hostname_ << " PRIVMSG " << target_client->nick_ << " :" << message_content << "\r\n";
-
-    // // Send the message to the target client
-    // target_client->messages_outgoing_.append(oss.str());
-    // server_.epoll_in_out(target_client->fd_);
+    if (!(channel->is_on_channel(sender.fd_))) {
+      REPLY_ERR_USERNOTINCHANNEL(sender, target);
+      return;
+    }
+    string full_message = ":" + sender.nick_ + "!" + sender.username_ + "@" + sender.hostname_ + " PRIVMSG " + target + " :" + message_content + "\r\n";
+    channel->broadcast(sender.fd_, full_message);
+  } 
+  else {
+    Client* target_client = server_.get_client(target);
+    if (target_client == NULL) {
+      REPLY_ERR_NOSUCHNICK(sender, target);
+      return;
+    }
+    // cout << "Target: " << target << std::endl;
+    // cout << "Target Nick: " << target_client->nick_ << std::endl;
+    string full_message = ":" + sender.nick_ + "!" + sender.username_ + "@" + sender.hostname_ + " PRIVMSG " + target_client->nick_ + " :" + message_content + "\r\n";
+    sender.add_message_out(full_message);
+    target_client->add_message_out(full_message);
+    server_.epoll_in_out(target_client->fd_);
   }
 }
 
@@ -378,7 +367,6 @@ void MessageHandler::command_MODE(Client& client, std::stringstream& message) {
     return;
   }
   if (channel_name[0] != '#' && channel_name[0] != '&') {
-    // User mode changes are not supported
     std::string reply = "501 " + client.nick_ + " :User mode changes are not supported\r\n";
     client.add_message_out(reply);
     return;     
