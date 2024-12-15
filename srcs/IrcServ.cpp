@@ -94,6 +94,7 @@ void IrcServ::add_to_close(Client* client) {
   clients_to_close.insert(client);
 }
 
+// this is only used for clients that needed to receive a msg before they are getting closed
 void IrcServ::cleanup_clients() {
   if (clients_to_close.empty()) {
     return;
@@ -152,7 +153,7 @@ void IrcServ::close_socket(int fd) {
 
 void IrcServ::delete_client(int client_fd) {
   if (epoll_ctl(ep_fd_, EPOLL_CTL_DEL, client_fd, NULL) == -1) {
-    perror("Error removing client socket from epoll");
+    perror("Error removing client socket from epoll (delete client)");
   }
   map<string, Channel*>::iterator it = channels_.begin();
   for (; it != channels_.end(); ++it) {
@@ -163,8 +164,6 @@ void IrcServ::delete_client(int client_fd) {
 }
 
 void IrcServ::cleanup() {
-  close_socket(server_fd_);
-  close_socket(ep_fd_);
   // Close and delete all client connections
   std::vector<int> client_fds;
   for (std::map<int, Client*>::iterator it = clients_.begin(); it != clients_.end(); ++it) {
@@ -179,6 +178,8 @@ void IrcServ::cleanup() {
   }
   channels_.clear();
   delete message_handler_;
+  close_socket(server_fd_);
+  close_socket(ep_fd_);
 }
 
 void IrcServ::register_signal_handlers() {

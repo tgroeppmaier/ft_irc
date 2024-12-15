@@ -23,6 +23,9 @@
 #define REPLY_ERR_NOTEXTTOSEND(client) \
   client.add_message_out("412 " + client.nick_ + " :No text to send\r\n")
 
+#define REPLY_ERR_INPUTTOOLONG(client) \
+  client.add_message_out("417 " + client.nick_ + " :Input is too long\r\n")
+
 #define REPLY_ERR_ERRONEUSNICKNAME(client, nick) \
   client.add_message_out("432 " + client.nick_ + " " + nick + " :Erroneous nickname\r\n")
 

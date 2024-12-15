@@ -54,6 +54,11 @@ void MessageHandler::process_incoming_messages(Client& client) {
   size_t end = 0;
   while ((end = client.messages_incoming_.find("\r\n", start)) != string::npos) {
     string message = client.messages_incoming_.substr(start, end - start);
+    if (message.size() > 512) {
+      REPLY_ERR_INPUTTOOLONG(client);
+      start = end + 2;
+      continue;
+    }
     // cout << message << std::endl; // DEBUG
     start = end + 2;
     stringstream ss(message);
