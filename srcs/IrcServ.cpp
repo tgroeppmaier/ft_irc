@@ -335,7 +335,11 @@ void IrcServ::event_loop() {
           close(client_fd);
           continue;
         }
-        Client* client = new Client(client_fd, client_addr, addr_len, client_hostname); // add malloc check
+        Client* client = new (std::nothrow) Client(client_fd, client_addr, addr_len, client_hostname);
+        if (client == NULL) {
+          std::cerr << "Memory allocation failed for client" << std::endl;
+          return;
+        }
         clients_[client_fd] = client;
         if (password_.empty()) {
           client->state_ = WAITING_FOR_NICK;
@@ -360,7 +364,7 @@ void IrcServ::event_loop() {
         if ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
-          cout << "\033[31m" << buffer << "\033[0m" << endl; // debug purposes       
+          // cout << "\033[31m" << buffer << "\033[0m" << '\n'; // debug purposes       
           message_handler_->process_incoming_messages(*client);
         } 
         else if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {
