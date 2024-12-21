@@ -228,10 +228,10 @@ void MessageHandler::command_USER(Client& client, stringstream& message) {
   reply += "001 " + client.nick_ + " :Welcome to the IRC server\r\n";
   reply += "002 " + client.nick_ + " :Your host is " + inet_ntoa(server_.server_addr_.sin_addr) + ", running version 1.0\r\n";
   reply += "003 " + client.nick_ + " :This server was created today\r\n";
-  reply += "004 " + client.nick_ + " " + inet_ntoa(server_.server_addr_.sin_addr) + " 1.0 o o\r\n";
+  reply += "004 " + client.nick_ + " " + inet_ntoa(server_.server_addr_.sin_addr) + " 1.0 - itkol\r\n";
   client.add_message_out(reply);
   std::cout << "Handling USER command for client " << client.username_ << std::endl;
-}
+  }
 
 void MessageHandler::command_PING(Client& client, stringstream& message) {
   if (!client_registered(client)) {

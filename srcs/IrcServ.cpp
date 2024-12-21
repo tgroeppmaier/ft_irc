@@ -214,7 +214,8 @@ void IrcServ::set_non_block(int sock_fd) {
 void IrcServ::initializeServerAddr() {
   memset(&server_addr_, 0, sizeof(server_addr_));
   server_addr_.sin_family = AF_INET;
-  server_addr_.sin_addr.s_addr = inet_addr("127.0.0.1"); //htonl(INADDR_ANY); // Listen on all interfaces
+  // server_addr_.sin_addr.s_addr = inet_addr("127.0.0.1"); // Listen on localhost
+  server_addr_.sin_addr.s_addr = htonl(INADDR_ANY); // Listen on all interfaces
   server_addr_.sin_port = htons(static_cast<uint16_t>(port_));
 }
 
@@ -270,23 +271,7 @@ void IrcServ::start() {
     exit(EXIT_FAILURE);
   }
   char* bound_ip = inet_ntoa(bound_addr.sin_addr);
-  cout << "Server started on IP " << bound_ip << " and port " << port_ << endl;
-
-  //  // Perform reverse DNS lookup to get the hostname
-  // {
-  //   struct hostent* he;
-  //   he = gethostbyaddr((const void*)&bound_addr.sin_addr, sizeof(bound_addr.sin_addr), AF_INET);
-  //   if (he == NULL) {
-  //     perror("Error. Failed to resolve IP address to hostname");
-  //     cleanup();
-  //     exit(EXIT_FAILURE);
-  //   }
-
-  //   // Set the hostname
-  //   hostname_ = he->h_name;
-  // }
-  // cout << "Server hostname: " << hostname_ << endl;
-
+  cout << "Server started on IP " << bound_ip << " and port " << port_ << endl; // not the actual ip address but 0.0.0.0
   event_loop();
 }
 
@@ -314,18 +299,6 @@ void IrcServ::event_loop() {
           }
         }
         set_non_block(client_fd);
-
-        // Get the client's IP address
-        // char* client_ip = inet_ntoa(client_addr.sin_addr);
-        // std::string client_hostname(client_ip);
-
-        // // Optionally, attempt to get the hostname
-        // struct hostent* host_entry = gethostbyaddr(&client_addr.sin_addr, sizeof(client_addr.sin_addr), AF_INET);
-        // if (host_entry && host_entry->h_name) {
-        //   client_hostname = host_entry->h_name;
-        // }
-        // cout << "Hostname: " << client_hostname << endl;
-
         char* client_ip = inet_ntoa(client_addr.sin_addr);
         std::string client_hostname(client_ip);
 
@@ -347,8 +320,6 @@ void IrcServ::event_loop() {
         else {
           client->state_ = WAITING_FOR_PASS;
         }
-        // cout << "Client Hostname " << client->hostname_ << endl;
-        // cout << "Client State " << client->state_ << endl;
       }
       else if (events[i].events & EPOLLOUT) { // fd is ready to send messages
         client_fd = events[i].data.fd;
