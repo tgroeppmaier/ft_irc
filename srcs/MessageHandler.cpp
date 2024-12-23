@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <sys/epoll.h>
 #include <string>
-#include <arpa/inet.h> // For inet_ntoa
+#include <arpa/inet.h>
 #include <algorithm>
 #include <cctype>
 #include "MessageHandler.hpp"
@@ -254,7 +254,7 @@ void MessageHandler::command_QUIT(Client& client, stringstream& message) {
     quit_message.erase(0, 1);
   }
   string broadcast_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " QUIT :" + quit_message + "\r\n";
-  client.message_to_all_channels(client.fd_, broadcast_message);
+  client.message_to_all_channels(broadcast_message);
   server_.delete_client(client.fd_);
 }
 
@@ -327,7 +327,7 @@ void MessageHandler::command_PRIVMSG(Client& sender, stringstream& message) {
       return;
     }
     string full_message = ":" + sender.nick_ + "!" + sender.username_ + "@" + sender.hostname_ + " PRIVMSG " + target + " :" + message_content + "\r\n";
-    channel->broadcast(sender.fd_, full_message);
+    channel->broadcast(full_message);
   } 
   else {
     Client* target_client = server_.get_client(target);
@@ -425,11 +425,11 @@ void MessageHandler::command_MODE(Client& client, stringstream& message) {
         if (add_mode) {
           channel->add_operator(*target);
           std::string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel->get_name() + " +o " + target->nick_ + "\r\n";
-          channel->broadcast(client.fd_, reply);
+          channel->broadcast(reply);
         } else {
           channel->remove_operator(target->fd_);
           std::string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel->get_name() + " -o " + target->nick_ + "\r\n";
-          channel->broadcast(client.fd_, reply);
+          channel->broadcast(reply);
         }
         break;
       }
@@ -455,7 +455,7 @@ void MessageHandler::command_MODE(Client& client, stringstream& message) {
     }
   }
   string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel_name + " " + mode_changes + "\r\n";
-  channel->broadcast(client.fd_, reply);
+  channel->broadcast(reply);
 }
 
 void MessageHandler::command_PASS(Client& client, stringstream& message) {
@@ -525,7 +525,7 @@ void MessageHandler::command_KICK(Client& client, stringstream& message) {
     message_content = "No reason specified";
   }
   string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " KICK " + channel_name + " " + target + " :" + message_content + "\r\n";
-  channel->broadcast(client.fd_, reply);
+  channel->broadcast(reply);
   channel->remove_client(*client_to_kick);
   client_to_kick->remove_channel(channel->get_name());
 }
@@ -628,7 +628,7 @@ void MessageHandler::command_PART(Client& client, stringstream& message) {
   string part_message;
   message >> part_message;
   string full_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " PART " + channel_name + " " + part_message + "\r\n";
-  channel->broadcast(client.fd_, full_message);
+  channel->broadcast(full_message);
   channel->remove_client(client);
   client.remove_channel(channel->get_name());
 }

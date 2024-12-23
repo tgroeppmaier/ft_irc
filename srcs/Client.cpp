@@ -30,10 +30,9 @@ void Client::add_message_out(const std::string message) {
   messages_outgoing_.append(message);
 }
 
-void Client::message_to_all_channels(int sender_fd, const std::string& message) {
-  map<string, Channel*>::const_iterator it;
-  for (it = channels_.begin(); it != channels_.end(); ++it) {
-    (*it).second->broadcast(sender_fd, message);
+void Client::message_to_all_channels(const std::string& message) {
+  for (std::map<std::string, Channel*>::iterator it = channels_.begin(); it != channels_.end(); ++it) {
+    (*it).second->broadcast(message);
   }
 }
 
@@ -46,7 +45,7 @@ void Client::remove_from_all_channels() {
 
 void Client::broadcast_all_channels(const std::string& message) {
   for (std::map<std::string, Channel*>::iterator it = channels_.begin(); it != channels_.end(); ++it) {
-    it->second->broadcast(fd_, message);
+    it->second->broadcast(message);
   }
 }
 

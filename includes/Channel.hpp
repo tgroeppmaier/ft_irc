@@ -31,7 +31,7 @@ public:
   ~Channel();
 
   // void join_message_to_all(Client& client);
-  void broadcast(int sender_fd, const std::string& message);
+  void broadcast(const std::string& message);
   void add_client(Client& client);
   void remove_client(Client& client);
   void remove_client_invite_list(int fd);

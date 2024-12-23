@@ -59,8 +59,8 @@ public:
   Channel* get_channel(const std::string& name);
   Client* get_client(const std::string& name);
 
-  // IrcServ(const IrcServ &other);
-  // IrcServ &operator=(const IrcServ &other);
+  IrcServ(const IrcServ &other);
+  IrcServ &operator=(const IrcServ &other);
 
   void start();
   void cleanup();

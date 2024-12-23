@@ -12,7 +12,7 @@ Channel::Channel(IrcServ& server, const std::string name, Client& client) :  ser
 
 Channel::~Channel() {}
 
-void Channel::broadcast(int sender_fd, const std::string& message) {
+void Channel::broadcast(const std::string& message) {
   std::map<int, Client*>::const_iterator it = clients_.begin();
   for (; it != clients_.end(); ++it) {
       it->second->add_message_out(message);
@@ -26,7 +26,7 @@ void Channel::add_client(Client& client) {
   invite_list_.erase(client.fd_);
 
   string join_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " JOIN " + name_ + "\r\n";
-  broadcast(client.fd_, join_message);
+  broadcast(join_message);
 
   std::string reply;
   reply.reserve(128);
@@ -62,7 +62,7 @@ void Channel::remove_client_invite_list(int fd) {
 void Channel::invite_client(Client& inviter, Client& invitee) {
   invite_list_.insert(invitee.fd_);
   string message = ":" + inviter.nick_ + "!" + inviter.username_ + "@" + inviter.hostname_ + " INVITE " + invitee.nick_ + " :" + name_ + "\r\n";
-  broadcast(inviter.fd_, message);
+  broadcast(message);
 }
 
 bool Channel::is_invited(int fd) {
@@ -148,7 +148,7 @@ void Channel::modify_topic(Client& client, const std::string& topic) {
     topic_ = topic;
     reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " TOPIC " + name_ + " :" + topic + "\r\n";
   }
-  broadcast(client.fd_, reply);
+  broadcast(reply);
 }
 
 string Channel::get_mode() {

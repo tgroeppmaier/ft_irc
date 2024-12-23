@@ -41,6 +41,40 @@ IrcServ::IrcServ(int port, std::string password) :
   instance_ = this;
 }
 
+// Copy constructor
+IrcServ::IrcServ(const IrcServ &other) :
+  message_handler_(new MessageHandler(*this)),
+  channels_(other.channels_),
+  clients_to_close(other.clients_to_close),
+  clients_(other.clients_),
+  password_(other.password_),
+  hostname_(other.hostname_),
+  port_(other.port_),
+  server_fd_(other.server_fd_),
+  ep_fd_(other.ep_fd_) {
+  initializeServerAddr();
+  instance_ = this;
+}
+
+// Copy assignment operator
+IrcServ &IrcServ::operator=(const IrcServ &other) {
+  if (this != &other) {
+    delete message_handler_;
+    channels_ = other.channels_;
+    clients_to_close = other.clients_to_close;
+    clients_ = other.clients_;
+    password_ = other.password_;
+    hostname_ = other.hostname_;
+    port_ = other.port_;
+    server_fd_ = other.server_fd_;
+    ep_fd_ = other.ep_fd_;
+    initializeServerAddr();
+    message_handler_ = new MessageHandler(*this);
+    instance_ = this;
+  }
+  return *this;
+}
+
 IrcServ::~IrcServ() {
 }
 
@@ -52,7 +86,6 @@ void IrcServ::epoll_in_out(int client_fd) {
     perror("Error modifying client socket to include EPOLLOUT");
     return;
   }
-  // cout << "Client fd " << client_fd << " modified to in out Events" << endl;
 }
 
 void IrcServ::epoll_in(int client_fd) {
@@ -63,7 +96,6 @@ void IrcServ::epoll_in(int client_fd) {
     perror("Error modifying client socket to include EPOLLOUT");
     return;
   }
-  // cout << "Client fd " << client_fd << " modified to in out Events" << endl;
 }
 
 bool IrcServ::check_password(std::string& password) {
@@ -239,7 +271,6 @@ void IrcServ::start() {
   }
   set_non_block(server_fd_);
   
-  // create epoll instance
   ep_fd_ = epoll_create1(0);
   if (ep_fd_ == -1) {
     perror("Error. Failed to create epoll instance");
@@ -262,7 +293,7 @@ void IrcServ::start() {
     exit(EXIT_FAILURE);
   }
 
-// Get the IP address on which the server is listening
+// Optional - Get the IP address on which the server is listening
   sockaddr_in bound_addr;
   socklen_t bound_addr_len = sizeof(bound_addr);
   if (getsockname(server_fd_, (sockaddr*)&bound_addr, &bound_addr_len) == -1) {
@@ -271,7 +302,8 @@ void IrcServ::start() {
     exit(EXIT_FAILURE);
   }
   char* bound_ip = inet_ntoa(bound_addr.sin_addr);
-  cout << "Server started on IP " << bound_ip << " and port " << port_ << endl; // not the actual ip address but 0.0.0.0
+  cout << "Server started on IP " << bound_ip << " and port " << port_ << endl;
+
   event_loop();
 }
 
@@ -301,8 +333,6 @@ void IrcServ::event_loop() {
         set_non_block(client_fd);
         char* client_ip = inet_ntoa(client_addr.sin_addr);
         std::string client_hostname(client_ip);
-
-
         if (!add_fd_to_epoll(client_fd)) {
           perror("Error adding client socket to epoll");
           close(client_fd);
@@ -335,7 +365,7 @@ void IrcServ::event_loop() {
         if ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
-          // cout << "\033[31m" << buffer << "\033[0m" << '\n'; // debug purposes       
+          cout << "\033[31m" << buffer << "\033[0m" << '\n'; // debug purposes       
           message_handler_->process_incoming_messages(*client);
         } 
         else if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {

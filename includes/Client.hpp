@@ -43,7 +43,7 @@ public:
 
   void add_buffer_to(const char* message);
   void add_message_out(const std::string message);
-  void message_to_all_channels(int sender_fd, const std::string& message);
+  void message_to_all_channels(const std::string& message);
   void remove_from_all_channels();
   void broadcast_all_channels(const std::string& message);
   void add_channel(const std::string& name, Channel* channel);

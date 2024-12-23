@@ -66,8 +66,7 @@ However, since **epoll** is a Linux system call, this server runs only on Linux.
 
 ### Testing
 
-Contrary to the Instructions in the pdf, testing the server with netcat `nc <hostname / ip> <port>` is not possible because before each send the socket has to be checked first if its ready. Netcat does not seem to answer that. The server can be connected to with telnet `telnet <hostname/ip> <port>` and then all the IRC commands work the same as from a client programm.
-Telnet is also used in `test.sh`, which can be used to spam a channel with thousands of messages per second (after deactivating anti flood in the client).
+The server can be tested with `nc <hostname / ip> <port>`. The server handles partially sent messages but each full message must manually be terminated with Ctrl + V, Ctrl + M to insert a carriage return (\r) and then enter (\n). The server can also be connected to with telnet `telnet <hostname/ip> <port>` and then all the IRC commands work the same as from a client programm. Telnet is also used in `test.sh`, which spams a channel with thousands of messages per second (after deactivating anti flood in the client).
 
 #### Useful Shell Commands
 
@@ -116,7 +115,7 @@ Telnet is also used in `test.sh`, which can be used to spam a channel with thous
 ### Design choices
 
 This server uses the more modern RFC 2812 IRC implementation.  
-Because of the requirement to check the sockets readiness before every send and receive all the message to a client will be sent at once in one long cstring. This is possible because IRC messages all end with `/n/r`. For the receiving a large buffer of 4096 bytes is used to read many or most likely all messages that come from one client
+Because of the requirement to check the sockets readiness before every send and receive, all the message to a client will be sent at once in one long cstring. This is possible because IRC messages all end with `\r\n`. For the receiving a large buffer of 4096 bytes is used to read many or most likely all messages that come from one client
 
 ### High level overview
 
