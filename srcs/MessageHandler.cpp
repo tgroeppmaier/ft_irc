@@ -80,7 +80,7 @@ void MessageHandler::process_incoming_messages(Client& client) {
   }
   client.messages_incoming_.erase(0, start);
   server_.epoll_in_out(client.fd_);
-  // cout << client.messages_outgoing_ << std::endl; // DEBUG
+  std::cout << "\033[31m" << client.messages_outgoing_ << "\033[0m\n"; // DEBUG
 }
 
 bool MessageHandler::client_registered(Client& client) {
@@ -122,7 +122,6 @@ void MessageHandler::command_CAP(Client& client, stringstream& message) {
     string reply = "CAP * NAK :" + subcommand + "\r\n";
     client.add_message_out(reply);
   }
-  std::cout << "Handling CAP command for client " << client.fd_ << std::endl;
 }
 
 void MessageHandler::command_NICK(Client& client, stringstream& message) {
@@ -162,7 +161,6 @@ void MessageHandler::command_NICK(Client& client, stringstream& message) {
   if (client.state_ == WAITING_FOR_NICK) {
     client.state_ = WAITING_FOR_USER;
   }
-  std::cout << "Handling NICK command for client " << client.nick_ << std::endl;
 }
 
 void MessageHandler::command_USER(Client& client, stringstream& message) {
@@ -229,8 +227,7 @@ void MessageHandler::command_USER(Client& client, stringstream& message) {
   reply += "003 " + client.nick_ + " :This server was created today\r\n";
   reply += "004 " + client.nick_ + " " + inet_ntoa(server_.server_addr_.sin_addr) + " 1.0 - itkol\r\n";
   client.add_message_out(reply);
-  std::cout << "Handling USER command for client " << client.username_ << std::endl;
-  }
+}
 
 void MessageHandler::command_PING(Client& client, stringstream& message) {
   if (!client_registered(client)) {
@@ -362,7 +359,6 @@ void MessageHandler::command_MODE(Client& client, stringstream& message) {
   }
   string mode_changes;
   if (!(message >> mode_changes)) {
-    std::cout << "current mode " << channel->get_mode() << std::endl;
     string reply = "324 " + client.nick_ + " " + channel_name + " +" + channel->get_mode() + "\r\n";
     client.add_message_out(reply);
     return;

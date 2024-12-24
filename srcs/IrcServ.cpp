@@ -349,7 +349,7 @@ void IrcServ::event_loop() {
         if ((bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0)) > 0) {
           buffer[bytes_read] = '\0';
           client->add_buffer_to(buffer);
-          cout << "\033[31m" << buffer << "\033[0m" << '\n'; // debug purposes       
+          cout << "\033[32m" << buffer << "\033[0m" << '\n'; // debug purposes       
           message_handler_->process_incoming_messages(*client);
         } 
         else if (bytes_read == 0 || (bytes_read == -1 && errno != EWOULDBLOCK && errno != EAGAIN)) {
