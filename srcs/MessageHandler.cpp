@@ -59,7 +59,7 @@ void MessageHandler::process_incoming_messages(Client& client) {
       start = end + 2;
       continue;
     }
-    // cout << message << std::endl; // DEBUG
+    // std::cout << "\033[32m" << message << "\033[0m\n"; // DEBUG
     start = end + 2;
     stringstream ss(message);
     string command;
@@ -76,7 +76,6 @@ void MessageHandler::process_incoming_messages(Client& client) {
     } else {
       message  = "421 " + client.nick_ + " " + command + " :Unknown command\r\n";
       client.add_message_out(message);
-      std::cout << "Unknown command: " << command << std::endl;
     }
   }
   client.messages_incoming_.erase(0, start);

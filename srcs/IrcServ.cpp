@@ -90,7 +90,7 @@ void IrcServ::epoll_in_out(int client_fd) {
 
 void IrcServ::epoll_in(int client_fd) {
   epoll_event ev;
-  ev.events = EPOLLIN; // Listen for both input and output events
+  ev.events = EPOLLIN; // Listen for both input events
   ev.data.fd = client_fd;
   if (epoll_ctl(ep_fd_, EPOLL_CTL_MOD, client_fd, &ev) == -1) {
     perror("Error modifying client socket to include EPOLLOUT");
@@ -98,22 +98,19 @@ void IrcServ::epoll_in(int client_fd) {
   }
 }
 
-bool IrcServ::check_password(std::string& password) {
-  if (password == password_) {
-    return true;
-  }
-  return false;
+bool IrcServ::check_password(const string& password) {
+  return password == password_;
 }
 
-string IrcServ::to_upper(const std::string& str) {
+string IrcServ::to_upper(const string& str) {
   std::string upper_str = str;
   std::transform(upper_str.begin(), upper_str.end(), upper_str.begin(), ::toupper);
   return upper_str;
 }
 
-bool IrcServ::check_nick(std::string& nick) {
-  std::string upper_nick = to_upper(nick);
-  std::map<int, Client*>::const_iterator it;
+bool IrcServ::check_nick(const string& nick) {
+  string upper_nick = to_upper(nick);
+  map<int, Client*>::const_iterator it;
   for (it = clients_.begin(); it != clients_.end(); ++it) {
     if (to_upper(it->second->nick_) == upper_nick) {
       return false;
@@ -174,7 +171,7 @@ void IrcServ::signal_handler(int signal) {
 }
 
 void IrcServ::close_socket(int fd) {
-  if (fd != static_cast<uint16_t>(-1)) {
+  if (fd != -1) {
     if (close(fd) == -1) {
       perror("Error closing socket");
     } else {
@@ -195,8 +192,8 @@ void IrcServ::delete_client(int client_fd) {
   clients_.erase(client_fd);
 }
 
+// Close and delete all client connections
 void IrcServ::cleanup() {
-  // Close and delete all client connections
   std::vector<int> client_fds;
   for (std::map<int, Client*>::iterator it = clients_.begin(); it != clients_.end(); ++it) {
     client_fds.push_back(it->first);
@@ -219,12 +216,10 @@ void IrcServ::register_signal_handlers() {
   sa.sa_handler = IrcServ::signal_handler;
   sigemptyset(&sa.sa_mask);
   sa.sa_flags = 0;
-
   if (sigaction(SIGINT, &sa, NULL) == -1) {
       perror("Error registering SIGINT handler");
       exit(EXIT_FAILURE);
   }
-
   if (sigaction(SIGTERM, &sa, NULL) == -1) {
       perror("Error registering SIGTERM handler");
       exit(EXIT_FAILURE);
@@ -232,12 +227,7 @@ void IrcServ::register_signal_handlers() {
 }
 
 void IrcServ::set_non_block(int sock_fd) {
-  int flags = fcntl(sock_fd, F_GETFL, 0);
-  if (flags == -1) {
-    perror("Error. Failed to get socket flags");
-    exit(EXIT_FAILURE);
-  }
-  if (fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+  if (fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1) {
     perror("Error. Failed to set socket to non-blocking mode");
     exit(EXIT_FAILURE);
   }
@@ -270,29 +260,24 @@ void IrcServ::start() {
     exit(EXIT_FAILURE);
   }
   set_non_block(server_fd_);
-  
   ep_fd_ = epoll_create1(0);
   if (ep_fd_ == -1) {
     perror("Error. Failed to create epoll instance");
     exit(EXIT_FAILURE);
   }
-
   if(!add_fd_to_epoll(server_fd_)) {
     perror("Error adding server socket to epoll");
     exit(EXIT_FAILURE);
   }
-
   if (bind(server_fd_, (sockaddr*)&server_addr_, sizeof(server_addr_)) == -1) {
     perror("Error. Failed binding on port");
     cleanup();
     exit(EXIT_FAILURE);
   }
-
   if (listen(server_fd_, 10) == -1) {
     perror("Error. Failed to listen on socket");
     exit(EXIT_FAILURE);
   }
-
 // Optional - Get the IP address on which the server is listening
   sockaddr_in bound_addr;
   socklen_t bound_addr_len = sizeof(bound_addr);
@@ -303,7 +288,6 @@ void IrcServ::start() {
   }
   char* bound_ip = inet_ntoa(bound_addr.sin_addr);
   cout << "Server started on IP " << bound_ip << " and port " << port_ << endl;
-
   event_loop();
 }
 
@@ -341,23 +325,23 @@ void IrcServ::event_loop() {
         Client* client = new (std::nothrow) Client(client_fd, client_addr, addr_len, client_hostname);
         if (client == NULL) {
           std::cerr << "Memory allocation failed for client" << std::endl;
-          return;
+          close(client_fd);
+          continue;
         }
         clients_[client_fd] = client;
         if (password_.empty()) {
           client->state_ = WAITING_FOR_NICK;
-        }
-        else {
+        } else {
           client->state_ = WAITING_FOR_PASS;
         }
       }
-      else if (events[i].events & EPOLLOUT) { // fd is ready to send messages
+      else if (events[i].events & EPOLLOUT) { // fd is ready for writing (send)
         client_fd = events[i].data.fd;
         Client* client = clients_[client_fd];
         message_handler_->send_messages(*client);
         cleanup_clients();
       }
-      else if (events[i].events & EPOLLIN) { // event on client fd (incoming message)
+      else if (events[i].events & EPOLLIN) { // fd is ready for reading (incoming message)
         client_fd = events[i].data.fd;
         Client* client = clients_[client_fd];
         ssize_t bytes_read;

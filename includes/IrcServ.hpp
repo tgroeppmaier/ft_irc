@@ -53,8 +53,8 @@ public:
   void create_channel(const std::string& name, Client& admin);
   void epoll_in_out(int fd);
   void epoll_in(int fd);
-  bool check_password(std::string& password);
-  bool check_nick(std::string& nick);
+  bool check_password(const std::string& password);
+  bool check_nick(const std::string& nick);
 
   Channel* get_channel(const std::string& name);
   Client* get_client(const std::string& name);
