@@ -10,7 +10,9 @@ Channel::Channel(IrcServ& server, const std::string name, Client& client) :  ser
   clients_[client.fd_] = &client;
 }
 
-Channel::~Channel() {}
+Channel::~Channel() {
+  modes_.clear();
+}
 
 void Channel::broadcast(const std::string& message) {
   std::map<int, Client*>::const_iterator it = clients_.begin();
@@ -53,6 +55,9 @@ void Channel::remove_client(Client& client) {
   clients_.erase(client.fd_);
   operators_.erase(client.fd_);
   invite_list_.erase(client.fd_);
+  if (clients_.empty()) {
+    server_.delete_channel(name_);
+  }
 }
 
 void Channel::remove_client_invite_list(int fd) {
@@ -94,23 +99,10 @@ bool Channel::is_on_channel(int fd) {
 }
 
 void Channel::set_mode(const std::string& mode) {
-  bool add_mode = true;
-  for (std::string::const_iterator it = mode.begin(); it != mode.end(); ++it) {
-    char c = *it;
-    if (c == '+') {
-      add_mode = true;
-    } 
-    else if (c == '-') {
-      add_mode = false;
-    } 
-    else {
-      if (add_mode) {
-        modes_.insert(c);
-      } 
-      else {
-        modes_.erase(c);
-      }
-    }
+  if (mode[0] == '-') {
+    modes_.erase(mode[1]);
+  } else {
+    modes_.insert(mode[0]);
   }
 }
 

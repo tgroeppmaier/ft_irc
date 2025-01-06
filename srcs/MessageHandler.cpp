@@ -115,7 +115,6 @@ void MessageHandler::command_CAP(Client& client, stringstream& message) {
       client.add_message_out(reply);
     }
   } else if (subcommand == "END") {
-    // Optional: Mark capabilities negotiation as complete
     string reply = "CAP * END\r\n";
     client.add_message_out(reply);
   } else {
@@ -258,51 +257,83 @@ void MessageHandler::command_JOIN(Client& client, stringstream& message) {
   if (!client_registered(client)) {
     return;
   }
-  string channel_name;
-  string key;
-  if (!(message >> channel_name)) {
+  string channels, keys;
+  if (!(message >> channels)) {
     REPLY_ERR_NEEDMOREPARAMS(client, "JOIN");
     return;
   }
-  std::getline(message >> std::ws, key);
-  if (channel_name[0] != '#') { // Only support local channels prefixed with '#'
-    REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
-    return;
+  message >> keys;  // Optional keys
+
+  // Split channels and keys
+  std::vector<string> channel_list;
+  std::vector<string> key_list;
+  stringstream channel_stream(channels);
+  string channel_name;
+  while (std::getline(channel_stream, channel_name, ',')) {
+    if (!channel_name.empty()) {
+      channel_list.push_back(channel_name);
+    }
   }
-  if (client.chan_limit_reached()) {
-    REPLY_ERR_TOOMANYCHANNELS(client, channel_name);
-    return;
+
+  stringstream key_stream(keys);
+  string key;
+  while (std::getline(key_stream, key, ',')) {
+    if (!key.empty()) {
+      key_list.push_back(key);
+    }
   }
-  Channel* channel = server_.get_channel(channel_name);
-  if (channel == NULL) {
-    server_.create_channel(channel_name, client);
-    return;
+
+  // Process each channel
+  for (size_t i = 0; i < channel_list.size(); ++i) {
+    const string& current_channel = channel_list[i];
+    const string current_key = i < key_list.size() ? key_list[i] : "";
+    Channel* channel = server_.get_channel(current_channel);
+    if (channel && channel->get_mode().find('k') != string::npos && i >= key_list.size()) {
+      // Channel requires key but no key provided
+      REPLY_ERR_BADCHANNELKEY(client, current_channel);
+      continue;
+    }
+
+    if (current_channel[0] != '#') { // Only support local channels prefixed with '#'
+      REPLY_ERR_NOSUCHCHANNEL(client, current_channel);
+      continue;
+    }
+    if (client.chan_limit_reached()) {
+      REPLY_ERR_TOOMANYCHANNELS(client, current_channel);
+      continue;
+    }
+    if (channel == NULL) {
+      server_.create_channel(current_channel, client);
+      continue;
+    }
+    string mode = channel->get_mode();
+    if (mode.find('i') != string::npos && !channel->is_invited(client.fd_)) {
+      REPLY_ERR_INVITEONLYCHAN(client, current_channel);
+      continue;
+    }
+    if (mode.find('k') != string::npos && !channel->check_key(current_key)) {
+      REPLY_ERR_BADCHANNELKEY(client, current_channel);
+      continue;
+    }
+    if (channel->channel_full()) {
+      REPLY_ERR_CHANNELISFULL(client, current_channel);
+      continue;
+    }
+    channel->add_client(client);
   }
-  string mode = channel->get_mode();
-  if (mode.find('i') != string::npos && !channel->is_invited(client.fd_)) {
-    REPLY_ERR_INVITEONLYCHAN(client, channel_name);
-    return;
-  }
-  if (mode.find('k') != string::npos && !channel->check_key(key)) {
-    REPLY_ERR_BADCHANNELKEY(client, channel_name);
-    return;
-  }
-  if (channel->channel_full()) {
-    REPLY_ERR_CHANNELISFULL(client, channel_name);
-    return;
-  }
-  channel->add_client(client);
 }
 
 void MessageHandler::command_PRIVMSG(Client& sender, stringstream& message) {
   if (!client_registered(sender)) {
     return;
   }
-  string target;
-  if (!(message >> target)) {
+
+  string targets;
+  if (!(message >> targets)) {
     REPLY_ERR_NORECIPIENT(sender, "PRIVMSG");
     return;
   }
+
   string message_content;
   std::getline(message >> std::ws, message_content);
   if (message_content.empty()) {
@@ -312,29 +343,47 @@ void MessageHandler::command_PRIVMSG(Client& sender, stringstream& message) {
   if (!message_content.empty() && message_content[0] == ':') {
     message_content.erase(0, 1);
   }
-  if (target[0] == '#' || target[0] == '&') {
-    Channel* channel = server_.get_channel(target);
-    if (target[0] == '&' || channel == NULL) {
-      REPLY_ERR_NOSUCHCHANNEL(sender, target);
-      return;
+
+  // Split targets by comma
+  std::vector<string> target_list;
+  string target;
+  stringstream target_stream(targets);
+  while (std::getline(target_stream, target, ',')) {
+    if (!target.empty()) {
+      target_list.push_back(target);
     }
-    if (!(channel->is_on_channel(sender.fd_))) {
-      REPLY_ERR_USERNOTINCHANNEL(sender, target);
-      return;
+  }
+
+  for (std::vector<string>::iterator it = target_list.begin(); it != target_list.end(); ++it) {
+    const string& current_target = *it;
+    if (current_target[0] == '#' || current_target[0] == '&') {
+      Channel* channel = server_.get_channel(current_target);
+      if (current_target[0] == '&' || channel == NULL) {
+        REPLY_ERR_NOSUCHCHANNEL(sender, current_target);
+        continue;
+      }
+      if (!(channel->is_on_channel(sender.fd_))) {
+        REPLY_ERR_USERNOTINCHANNEL(sender, current_target);
+        continue;
+      }
+      string full_message = ":" + sender.nick_ + "!" + sender.username_ + "@" +
+                           sender.hostname_ + " PRIVMSG " + current_target +
+                           " :" + message_content + "\r\n";
+      channel->broadcast(full_message);
     }
-    string full_message = ":" + sender.nick_ + "!" + sender.username_ + "@" + sender.hostname_ + " PRIVMSG " + target + " :" + message_content + "\r\n";
-    channel->broadcast(full_message);
-  } 
-  else {
-    Client* target_client = server_.get_client(target);
-    if (target_client == NULL) {
-      REPLY_ERR_NOSUCHNICK(sender, target);
-      return;
+    else {
+      Client* target_client = server_.get_client(current_target);
+      if (target_client == NULL) {
+        REPLY_ERR_NOSUCHNICK(sender, current_target);
+        continue;
+      }
+      string full_message = ":" + sender.nick_ + "!" + sender.username_ + "@" +
+                           sender.hostname_ + " PRIVMSG " + target_client->nick_ +
+                           " :" + message_content + "\r\n";
+      sender.add_message_out(full_message);
+      target_client->add_message_out(full_message);
+      server_.epoll_in_out(target_client->fd_);
     }
-    string full_message = ":" + sender.nick_ + "!" + sender.username_ + "@" + sender.hostname_ + " PRIVMSG " + target_client->nick_ + " :" + message_content + "\r\n";
-    sender.add_message_out(full_message);
-    target_client->add_message_out(full_message);
-    server_.epoll_in_out(target_client->fd_);
   }
 }
 
@@ -367,90 +416,108 @@ void MessageHandler::command_MODE(Client& client, stringstream& message) {
     REPLY_ERR_CHANOPRIVSNEEDED(client, channel->get_name());
     return;
   }
-  std::cout << "mode changes: " << mode_changes << std::endl;
-  if (mode_changes.empty() || (mode_changes.at(0) != '+' && mode_changes.at(0) != '-')) {
-    string reply = "461 " + client.nick_ + " " + channel_name + " :Invalid mode change format\r\n";
-    client.add_message_out(reply);
-    return;
-  }
 
-  bool add_mode = (mode_changes[0] == '+');
-  for (size_t i = 1; i < mode_changes.size(); ++i) {
-    char mode = mode_changes[i];
-    switch (mode) {
+  string mode_args;
+  std::getline(message >> std::ws, mode_args);
+  stringstream args_stream(mode_args);
+  string full_reply = ":" + client.nick_ + "!" + client.username_ + "@" +
+                     client.hostname_ + " MODE " + channel_name;
+  string mode_str;
+  bool add_mode = true;
+
+  for (string::iterator it = mode_changes.begin(); it != mode_changes.end(); ++it) {
+    char c = *it;
+    if (c == '+' || c == '-') {
+      if (!mode_str.empty()) {
+        full_reply += " " + mode_str;
+        mode_str.clear();
+      }
+      add_mode = (c == '+');
+      mode_str = c;
+      continue;
+    }
+
+    mode_str += c;
+    switch (c) {
       case 'i':
-        if (add_mode) {
-          channel->set_mode("i");
-        } else {
-          channel->set_mode("-i");
-        }
+        if (add_mode) channel->set_mode("i");
+        else channel->set_mode("-i");
         break;
+
       case 't':
-        if (add_mode) {
-          channel->set_mode("t");
-        } else {
-          channel->set_mode("-t");
-        }
+        if (add_mode) channel->set_mode("t");
+        else channel->set_mode("-t");
         break;
+
       case 'k': {
         string key;
         if (add_mode) {
-          if (!(message >> key)) {
-            REPLY_ERR_NEEDMOREPARAMS(client, "MODE");
+          if (!(args_stream >> key)) {
+            REPLY_ERR_NEEDMOREPARAMS(client, "MODE +k");
             return;
           }
           channel->set_mode("k");
           channel->set_key(key);
+          full_reply += " " + key;
         } else {
+          channel->set_mode("-k");
           channel->remove_key();
         }
         break;
       }
+
       case 'o': {
         string nick;
-        if (!(message >> nick)) {
-          REPLY_ERR_NEEDMOREPARAMS(client, "MODE");
+        if (!(args_stream >> nick)) {
+          REPLY_ERR_NEEDMOREPARAMS(client, "MODE +/-o");
           return;
         }
         Client* target = channel->get_client(nick);
         if (!target) {
           REPLY_ERR_NOSUCHNICK(client, nick);
-          return;
+          continue;
         }
         if (add_mode) {
           channel->add_operator(*target);
-          std::string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel->get_name() + " +o " + target->nick_ + "\r\n";
-          channel->broadcast(reply);
         } else {
           channel->remove_operator(target->fd_);
-          std::string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel->get_name() + " -o " + target->nick_ + "\r\n";
-          channel->broadcast(reply);
         }
+        full_reply += " " + nick;
         break;
       }
+
       case 'l': {
-        ushort limit;
         if (add_mode) {
-          if (!(message >> limit || limit > 100)) {
+          ushort limit;
+          if (!(args_stream >> limit) || limit > 100) {
             string reply = "461 " + client.nick_ + " MODE :Invalid user limit\r\n";
             client.add_message_out(reply);
             return;
           }
           channel->set_mode("l");
+          std::stringstream ss;
+          ss << limit;
           channel->set_user_limit(limit);
+          full_reply += " " + ss.str();
         } else {
+          channel->set_mode("-l");
           channel->remove_user_limit();
         }
         break;
       }
+
       default:
-        string reply = "472 " + client.nick_ + " " + mode + " :is unknown mode char to me\r\n";
+        string reply = "472 " + client.nick_ + " " + c + " :is unknown mode char to me\r\n";
         client.add_message_out(reply);
         return;
     }
   }
-  string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " MODE " + channel_name + " " + mode_changes + "\r\n";
-  channel->broadcast(reply);
+
+  if (!mode_str.empty()) {
+    full_reply += " " + mode_str;
+  }
+  full_reply += "\r\n";
+  channel->broadcast(full_reply);
 }
 
 void MessageHandler::command_PASS(Client& client, stringstream& message) {
@@ -492,37 +559,43 @@ void MessageHandler::command_KICK(Client& client, stringstream& message) {
   if (!client_registered(client)) {
     return;
   }
-  string channel_name, target;
-  if (!(message >> channel_name >> target)) {
+  string channel_name, targets;
+  if (!(message >> channel_name >> targets)) {
     REPLY_ERR_NEEDMOREPARAMS(client, "KICK");
     return;
   }
-  Channel* channel = server_.get_channel(channel_name);
-  if (!channel || (channel_name[0] != '#')) {
-    REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
-    return;
+
+  stringstream target_stream(targets);
+  string target;
+  while (std::getline(target_stream, target, ',')) {
+    if (target.empty()) continue;
+    Channel* channel = server_.get_channel(channel_name);
+    if (!channel || (channel_name[0] != '#')) {
+      REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
+      continue;
+    }
+    if (!channel->is_on_channel(client.fd_)) {
+      REPLY_ERR_NOTONCHANNEL(client, channel_name);
+      continue;
+    }
+    if (!channel->is_operator(client.fd_)) {
+      REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name);
+      continue;
+    }
+    Client* client_to_kick = channel->get_client(target);
+    if (!client_to_kick) {
+      REPLY_ERR_USERNOTINCHANNEL(client, channel_name);
+      continue;
+    }
+    string message_content = extract_message(message);
+    if (message_content.empty()) {
+      message_content = "No reason specified";
+    }
+    string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " KICK " + channel_name + " " + target + " :" + message_content + "\r\n";
+    channel->broadcast(reply);
+    channel->remove_client(*client_to_kick);
+    client_to_kick->remove_channel(channel->get_name());
   }
-  if (!channel->is_on_channel(client.fd_)) {
-    REPLY_ERR_NOTONCHANNEL(client, channel_name);
-    return;
-  }
-  if (!channel->is_operator(client.fd_)) {
-    REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name);
-    return;
-  }
-  Client* client_to_kick = channel->get_client(target);
-  if (!client_to_kick) {
-    REPLY_ERR_USERNOTINCHANNEL(client, channel_name);
-    return;
-  }
-  string message_content = extract_message(message);
-  if (message_content.empty()) {
-    message_content = "No reason specified";
-  }
-  string reply = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " KICK " + channel_name + " " + target + " :" + message_content + "\r\n";
-  channel->broadcast(reply);
-  channel->remove_client(*client_to_kick);
-  client_to_kick->remove_channel(channel->get_name());
 }
 
 void MessageHandler::command_INVITE(Client& client, stringstream& message) {
@@ -606,24 +679,33 @@ void MessageHandler::command_PART(Client& client, stringstream& message) {
   if (!client_registered(client)) {
     return;
   }
-  string channel_name;
-  if (!(message >> channel_name)) {
+  string channels;
+  if (!(message >> channels)) {
     REPLY_ERR_NEEDMOREPARAMS(client, "PART");
     return;
   }
-  Channel* channel = server_.get_channel(channel_name);
-  if (!channel || (channel_name[0] != '#')) {
-    REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
-    return;
-  }
-  if (!channel->is_on_channel(client.fd_)) {
-    REPLY_ERR_NOTONCHANNEL(client, channel_name);
-    return;
-  }
   string part_message;
-  message >> part_message;
-  string full_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " PART " + channel_name + " " + part_message + "\r\n";
-  channel->broadcast(full_message);
-  channel->remove_client(client);
-  client.remove_channel(channel->get_name());
+  std::getline(message >> std::ws, part_message);
+
+  stringstream channel_stream(channels);
+  string channel_name;
+  while (std::getline(channel_stream, channel_name, ',')) {
+    if (channel_name.empty()) {
+      continue;
+    }
+    Channel* channel = server_.get_channel(channel_name);
+    if (!channel || (channel_name[0] != '#')) {
+      REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
+      continue;
+    }
+    if (!channel->is_on_channel(client.fd_)) {
+      REPLY_ERR_NOTONCHANNEL(client, channel_name);
+      continue;
+    }
+    string stored_name = channel->get_name();
+    string full_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " PART " + channel_name + " " + part_message + "\r\n";
+    channel->broadcast(full_message);
+    channel->remove_client(client);
+    client.remove_channel(stored_name);
+  }
 }

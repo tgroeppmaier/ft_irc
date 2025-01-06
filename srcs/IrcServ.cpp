@@ -162,6 +162,14 @@ void IrcServ::create_channel(const std::string& name, Client& client) {
   channel->add_operator(client);
 }
 
+void IrcServ::delete_channel(const std::string& name) {
+  std::map<string, Channel*>::iterator it = channels_.find(name);
+  if (it != channels_.end()) {
+    delete it->second;
+    channels_.erase(it);
+  }
+}
+
 void IrcServ::signal_handler(int signal) {
   cout << "Signal " << signal << " received, cleaning up and exiting..." << endl;
   if (instance_) {
@@ -202,6 +210,7 @@ void IrcServ::cleanup() {
     delete_client(*it);
   }
   clients_.clear();
+  // Properly delete channels
   for (std::map<string, Channel*>::iterator it = channels_.begin(); it != channels_.end(); ++it) {
     delete it->second;
   }

@@ -51,6 +51,7 @@ public:
   void delete_client(int fd);
   void add_to_close(Client* client);
   void create_channel(const std::string& name, Client& admin);
+  void delete_channel(const std::string& name);
   void epoll_in_out(int fd);
   void epoll_in(int fd);
   bool check_password(const std::string& password);

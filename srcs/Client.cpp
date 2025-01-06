@@ -32,15 +32,15 @@ void Client::add_message_out(const std::string message) {
 
 void Client::message_to_all_channels(const std::string& message) {
   for (std::map<std::string, Channel*>::iterator it = channels_.begin(); it != channels_.end(); ++it) {
-    (*it).second->broadcast(message);
+    it->second->broadcast(message);
   }
 }
 
 void Client::remove_from_all_channels() {
-  map<string, Channel*>::iterator it;
-  for (it = channels_.begin(); it != channels_.end(); ++it) {
-    (*it).second->remove_client(*this);
+  for (map<string, Channel*>::iterator it = channels_.begin(); it != channels_.end(); ++it) {
+    it->second->remove_client(*this);
   }
+  channels_.clear();
 }
 
 void Client::broadcast_all_channels(const std::string& message) {
