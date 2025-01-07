@@ -11,10 +11,14 @@
 #include "IrcServ.hpp"
 
 using std::string; using std::cout; using std::endl; using std::map;
-IrcServ* IrcServ::instance_ = NULL;
+
+IrcServ& IrcServ::getInstance(int port, const std::string& password) {
+    static IrcServ instance(port, password);
+    return instance;
+}
 
 IrcServ::IrcServ(int port) :
-  message_handler_(new MessageHandler(*this)),
+  message_handler_(NULL),
   channels_(),
   clients_to_close(),
   clients_(),
@@ -24,11 +28,12 @@ IrcServ::IrcServ(int port) :
   server_fd_(0),
   ep_fd_(0) {
   initializeServerAddr();
-  instance_ = this;
+  message_handler_ = new MessageHandler();
+  message_handler_->set_server(*this);
 }
 
 IrcServ::IrcServ(int port, std::string password) :
-  message_handler_(new MessageHandler(*this)),
+  message_handler_(NULL),
   channels_(),
   clients_to_close(),
   clients_(),
@@ -38,41 +43,8 @@ IrcServ::IrcServ(int port, std::string password) :
   server_fd_(0),
   ep_fd_(0) {
   initializeServerAddr();
-  instance_ = this;
-}
-
-// Copy constructor
-IrcServ::IrcServ(const IrcServ &other) :
-  message_handler_(new MessageHandler(*this)),
-  channels_(other.channels_),
-  clients_to_close(other.clients_to_close),
-  clients_(other.clients_),
-  password_(other.password_),
-  hostname_(other.hostname_),
-  port_(other.port_),
-  server_fd_(other.server_fd_),
-  ep_fd_(other.ep_fd_) {
-  initializeServerAddr();
-  instance_ = this;
-}
-
-// Copy assignment operator
-IrcServ &IrcServ::operator=(const IrcServ &other) {
-  if (this != &other) {
-    delete message_handler_;
-    channels_ = other.channels_;
-    clients_to_close = other.clients_to_close;
-    clients_ = other.clients_;
-    password_ = other.password_;
-    hostname_ = other.hostname_;
-    port_ = other.port_;
-    server_fd_ = other.server_fd_;
-    ep_fd_ = other.ep_fd_;
-    initializeServerAddr();
-    message_handler_ = new MessageHandler(*this);
-    instance_ = this;
-  }
-  return *this;
+  message_handler_ = new MessageHandler();
+  message_handler_->set_server(*this);
 }
 
 IrcServ::~IrcServ() {
@@ -172,9 +144,7 @@ void IrcServ::delete_channel(const std::string& name) {
 
 void IrcServ::signal_handler(int signal) {
   cout << "Signal " << signal << " received, cleaning up and exiting..." << endl;
-  if (instance_) {
-      instance_->cleanup();
-  }
+  IrcServ::getInstance().cleanup();
   exit(0);
 }
 

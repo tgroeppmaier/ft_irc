@@ -10,7 +10,7 @@
 using std::string;
 using std::stringstream;
 
-MessageHandler::MessageHandler(IrcServ& server) : server_(server) {
+MessageHandler::MessageHandler() : server_(NULL) {
   command_map_["CAP"] = &MessageHandler::command_CAP;
   command_map_["NICK"] = &MessageHandler::command_NICK;
   command_map_["USER"] = &MessageHandler::command_USER;
@@ -38,14 +38,14 @@ void MessageHandler::send_messages(Client& client) {
   // }
   if (bytes_sent == static_cast<ssize_t>(length)) { // all messages have been sent
     client.messages_outgoing_.clear();
-    server_.epoll_in(client.fd_);
+    server_->epoll_in(client.fd_);
   }
   else if (bytes_sent > 0) { // partial send, try again next loop
     client.messages_outgoing_.erase(0, static_cast<size_t>(bytes_sent));
   }
   else if (bytes_sent == -1 && (errno != EAGAIN && errno != EWOULDBLOCK)) {
     perror("Error sending message to client");
-    server_.delete_client(client.fd_);
+    server_->delete_client(client.fd_);
   }
 }
 
@@ -67,7 +67,7 @@ void MessageHandler::process_incoming_messages(Client& client) {
       std::cerr << "Error extracting command" << std::endl;
       return;
     }
-    command = server_.to_upper(command);
+    command = server_->to_upper(command);
     std::map<string, void(MessageHandler::*)(Client&, stringstream&)>::const_iterator cmd_it = command_map_.find(command);
     if (cmd_it != command_map_.end()) {
         (this->*(cmd_it->second))(client, ss);
@@ -79,7 +79,7 @@ void MessageHandler::process_incoming_messages(Client& client) {
     }
   }
   client.messages_incoming_.erase(0, start);
-  server_.epoll_in_out(client.fd_);
+  server_->epoll_in_out(client.fd_);
   std::cout << "\033[31m" << client.messages_outgoing_ << "\033[0m\n"; // DEBUG
 }
 
@@ -94,7 +94,7 @@ bool MessageHandler::client_registered(Client& client) {
 void MessageHandler::ERR_NOTREGISTERED(Client& client) {
   string message = "451 * :You have not registered\r\n";
   client.add_message_out(message);
-  server_.add_to_close(&client);
+  server_->add_to_close(&client);
 }
 
 void MessageHandler::command_CAP(Client& client, stringstream& message) {
@@ -148,7 +148,7 @@ void MessageHandler::command_NICK(Client& client, stringstream& message) {
       return;
     }
   }
-  if (!server_.check_nick(nick)) {
+  if (!server_->check_nick(nick)) {
     string reply = "433 " + client.nick_ + " " + nick + " :Nickname is already in use\r\n";
     client.add_message_out(reply);
     return;
@@ -222,9 +222,9 @@ void MessageHandler::command_USER(Client& client, stringstream& message) {
   string reply;
   reply.reserve(128);
   reply += "001 " + client.nick_ + " :Welcome to the IRC server\r\n";
-  reply += "002 " + client.nick_ + " :Your host is " + inet_ntoa(server_.server_addr_.sin_addr) + ", running version 1.0\r\n";
+  reply += "002 " + client.nick_ + " :Your host is " + inet_ntoa(server_->server_addr_.sin_addr) + ", running version 1.0\r\n";
   reply += "003 " + client.nick_ + " :This server was created today\r\n";
-  reply += "004 " + client.nick_ + " " + inet_ntoa(server_.server_addr_.sin_addr) + " 1.0 - itkol\r\n";
+  reply += "004 " + client.nick_ + " " + inet_ntoa(server_->server_addr_.sin_addr) + " 1.0 - itkol\r\n";
   client.add_message_out(reply);
 }
 
@@ -250,7 +250,7 @@ void MessageHandler::command_QUIT(Client& client, stringstream& message) {
   }
   string broadcast_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " QUIT :" + quit_message + "\r\n";
   client.message_to_all_channels(broadcast_message);
-  server_.delete_client(client.fd_);
+  server_->delete_client(client.fd_);
 }
 
 void MessageHandler::command_JOIN(Client& client, stringstream& message) {
@@ -287,7 +287,7 @@ void MessageHandler::command_JOIN(Client& client, stringstream& message) {
   for (size_t i = 0; i < channel_list.size(); ++i) {
     const string& current_channel = channel_list[i];
     const string current_key = i < key_list.size() ? key_list[i] : "";
-    Channel* channel = server_.get_channel(current_channel);
+    Channel* channel = server_->get_channel(current_channel);
     if (channel && channel->get_mode().find('k') != string::npos && i >= key_list.size()) {
       // Channel requires key but no key provided
       REPLY_ERR_BADCHANNELKEY(client, current_channel);
@@ -303,7 +303,7 @@ void MessageHandler::command_JOIN(Client& client, stringstream& message) {
       continue;
     }
     if (channel == NULL) {
-      server_.create_channel(current_channel, client);
+      server_->create_channel(current_channel, client);
       continue;
     }
     string mode = channel->get_mode();
@@ -357,7 +357,7 @@ void MessageHandler::command_PRIVMSG(Client& sender, stringstream& message) {
   for (std::vector<string>::iterator it = target_list.begin(); it != target_list.end(); ++it) {
     const string& current_target = *it;
     if (current_target[0] == '#' || current_target[0] == '&') {
-      Channel* channel = server_.get_channel(current_target);
+      Channel* channel = server_->get_channel(current_target);
       if (current_target[0] == '&' || channel == NULL) {
         REPLY_ERR_NOSUCHCHANNEL(sender, current_target);
         continue;
@@ -372,7 +372,7 @@ void MessageHandler::command_PRIVMSG(Client& sender, stringstream& message) {
       channel->broadcast(full_message);
     }
     else {
-      Client* target_client = server_.get_client(current_target);
+      Client* target_client = server_->get_client(current_target);
       if (target_client == NULL) {
         REPLY_ERR_NOSUCHNICK(sender, current_target);
         continue;
@@ -382,7 +382,7 @@ void MessageHandler::command_PRIVMSG(Client& sender, stringstream& message) {
                            " :" + message_content + "\r\n";
       sender.add_message_out(full_message);
       target_client->add_message_out(full_message);
-      server_.epoll_in_out(target_client->fd_);
+      server_->epoll_in_out(target_client->fd_);
     }
   }
 }
@@ -401,7 +401,7 @@ void MessageHandler::command_MODE(Client& client, stringstream& message) {
     client.add_message_out(reply);
     return;     
   }
-  Channel* channel = server_.get_channel(channel_name);
+  Channel* channel = server_->get_channel(channel_name);
   if (!channel) {
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
@@ -531,7 +531,7 @@ void MessageHandler::command_PASS(Client& client, stringstream& message) {
     ERR_NOTREGISTERED(client);
     return;
   }
-  if (server_.check_password(password)) {
+  if (server_->check_password(password)) {
     client.state_ = WAITING_FOR_NICK;
   }
   else {
@@ -569,7 +569,7 @@ void MessageHandler::command_KICK(Client& client, stringstream& message) {
   string target;
   while (std::getline(target_stream, target, ',')) {
     if (target.empty()) continue;
-    Channel* channel = server_.get_channel(channel_name);
+    Channel* channel = server_->get_channel(channel_name);
     if (!channel || (channel_name[0] != '#')) {
       REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
       continue;
@@ -607,7 +607,7 @@ void MessageHandler::command_INVITE(Client& client, stringstream& message) {
     REPLY_ERR_NEEDMOREPARAMS(client, "INVITE");
     return;
   }
-  Channel* channel = server_.get_channel(channel_name);
+  Channel* channel = server_->get_channel(channel_name);
   if (!channel || (channel_name[0] != '#')) {
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
@@ -620,7 +620,7 @@ void MessageHandler::command_INVITE(Client& client, stringstream& message) {
     REPLY_ERR_CHANOPRIVSNEEDED(client, channel_name);
     return;
   }
-  Client* invitee = server_.get_client(target);
+  Client* invitee = server_->get_client(target);
   if (!invitee) {
     REPLY_ERR_NOSUCHNICK(client, target);
     return;
@@ -634,7 +634,7 @@ void MessageHandler::command_INVITE(Client& client, stringstream& message) {
   client.add_message_out(reply);
   string invite_message = ":" + client.nick_ + "!" + client.username_ + "@" + client.hostname_ + " INVITE " + target + " :" + channel_name + "\r\n";
   invitee->add_message_out(invite_message);
-  server_.epoll_in_out(invitee->fd_);
+  server_->epoll_in_out(invitee->fd_);
 }
 
 void MessageHandler::command_TOPIC(Client& client, stringstream& message) {
@@ -646,7 +646,7 @@ void MessageHandler::command_TOPIC(Client& client, stringstream& message) {
     REPLY_ERR_NEEDMOREPARAMS(client, "TOPIC");
     return;
   }
-  Channel* channel = server_.get_channel(channel_name);
+  Channel* channel = server_->get_channel(channel_name);
   if (!channel || (channel_name[0] != '#')) {
     REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
     return;
@@ -693,7 +693,7 @@ void MessageHandler::command_PART(Client& client, stringstream& message) {
     if (channel_name.empty()) {
       continue;
     }
-    Channel* channel = server_.get_channel(channel_name);
+    Channel* channel = server_->get_channel(channel_name);
     if (!channel || (channel_name[0] != '#')) {
       REPLY_ERR_NOSUCHCHANNEL(client, channel_name);
       continue;
@@ -708,4 +708,8 @@ void MessageHandler::command_PART(Client& client, stringstream& message) {
     channel->remove_client(client);
     client.remove_channel(stored_name);
   }
+}
+
+void MessageHandler::set_server(IrcServ& server) {
+    server_ = &server;
 }

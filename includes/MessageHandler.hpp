@@ -59,7 +59,11 @@ class Client;
 
 class MessageHandler {
 private:
-  IrcServ& server_;
+  // Prevent copying by declaring private (C++98 style)
+  MessageHandler(const MessageHandler&);
+  MessageHandler& operator=(const MessageHandler&);
+
+  IrcServ* server_;
   // Map of command strings to function pointers
   std::map<std::string, void(MessageHandler::*)(Client&, std::stringstream&)> command_map_;
 
@@ -82,15 +86,15 @@ private:
   void command_TOPIC(Client& client, std::stringstream& message);
   void command_PART(Client& client, std::stringstream& message);
 
-  void reply_TOPIC(Client& client, Channel& channel);
-
+  // void reply_TOPIC(Client& client, Channel& channel);
 
 public:
-  MessageHandler(IrcServ& server);
+  MessageHandler();
   ~MessageHandler();
 
   void process_incoming_messages(Client& client);
   void send_messages(Client& client);
+  void set_server(IrcServ& server);
 
 };
 

@@ -1,35 +1,64 @@
 #include <iostream>
 #include <string>
-#include <sstream>
+#include <cstdlib>
+#include <csignal>
+#include <cstring>
+#include <climits>
 #include "IrcServ.hpp"
-#include "MessageHandler.hpp"
 
-using namespace std;
+static void print_usage(const char* program_name) {
+  std::cout << "Usage: " << program_name << " <port> [password]\n"
+            << "  port     - Port number (1024-65535)\n"
+            << "  password - Optional server password\n";
+}
+
+static bool validate_port(const char* port_str, int& port) {
+  char* end;
+  long temp = std::strtol(port_str, &end, 10);
+  if (temp > INT_MAX || temp < INT_MIN) {
+    std::cerr << "Error: Port number out of range\n";
+    return false;
+  }
+  port = static_cast<int>(temp);
+  if (*end != '\0' || port <= 1024 || port > 65535) {
+    std::cerr << "Error: Port must be a number between 1024 and 65535\n";
+    return false;
+  }
+  return true;
+}
+
+static bool validate_password(const char* password) {
+  if (!password || !*password) {
+    std::cerr << "Error: Password cannot be empty\n";
+    return false;
+  }
+  size_t len = std::strlen(password);
+  if (len > 32) {
+    std::cerr << "Error: Password too long (max 32 characters)\n";
+    return false;
+  }
+  return true;
+}
 
 int main(int argc, char* argv[]) {
   if (argc < 2 || argc > 3) {
-    cerr << "Usage: " << argv[0] << " <port> <password>" << endl;
-    return 1;
+    print_usage(argv[0]);
+    return EXIT_FAILURE;
   }
 
-  // check for valid port range
-  string port_str = argv[1];
   int port;
-  stringstream ss(port_str);
-  if (!(ss >> port) || !ss.eof()) {
-    cerr << "Invalid port number: " << port_str << endl;
-    return 1;
+  if (!validate_port(argv[1], port)) {
+    return EXIT_FAILURE;
   }
-
-  if (argv[2]) {
-    string password = argv[2];
-    IrcServ server(port, password);
-    server.start();
+  if (argc == 3) {
+    if (!validate_password(argv[2])) {
+      return EXIT_FAILURE;
+    }
+    IrcServ::getInstance(port, argv[2]).start();
   } 
   else {
-    IrcServ server(port);
-    server.start();
+    IrcServ::getInstance(port).start();
   }
 
-  return 0;
+  return EXIT_SUCCESS;
 }
