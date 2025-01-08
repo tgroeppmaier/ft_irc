@@ -17,22 +17,7 @@ IrcServ& IrcServ::getInstance(int port, const std::string& password) {
     return instance;
 }
 
-IrcServ::IrcServ(int port) :
-  message_handler_(NULL),
-  channels_(),
-  clients_to_close(),
-  clients_(),
-  password_(),
-  hostname_(),
-  port_(port),
-  server_fd_(0),
-  ep_fd_(0) {
-  initializeServerAddr();
-  message_handler_ = new MessageHandler();
-  message_handler_->set_server(*this);
-}
-
-IrcServ::IrcServ(int port, std::string password) :
+IrcServ::IrcServ(int port, const std::string& password) :
   message_handler_(NULL),
   channels_(),
   clients_to_close(),
@@ -95,7 +80,7 @@ void IrcServ::add_to_close(Client* client) {
   clients_to_close.insert(client);
 }
 
-// this is only used for clients that needed to receive a msg before they are getting closed
+// this is only used for clients that need to receive a msg before they are getting closed
 void IrcServ::cleanup_clients() {
   if (clients_to_close.empty()) {
     return;

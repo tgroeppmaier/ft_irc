@@ -31,8 +31,7 @@ private:
   int ep_fd_;                          
 
   // Private constructors
-  IrcServ(int port);
-  IrcServ(int port, std::string password);
+  IrcServ(int port, const std::string& password);
   IrcServ(const IrcServ&);  // Prevent copying
   IrcServ& operator=(const IrcServ&);  // Prevent assignment
 

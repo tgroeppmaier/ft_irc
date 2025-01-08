@@ -33,9 +33,9 @@ MessageHandler::~MessageHandler() {
 void MessageHandler::send_messages(Client& client) {
   size_t length = client.messages_outgoing_.length();
   ssize_t bytes_sent = send(client.fd_, client.messages_outgoing_.c_str(), length, MSG_NOSIGNAL);
-  // if (bytes_sent > 0) {
-  //   cout << client.messages_outgoing_.substr(0, static_cast<size_t>(bytes_sent)) << std::endl; // DEBUG
-  // }
+  if (bytes_sent > 0) {
+    std::cout << "\033[31m" << client.messages_outgoing_.substr(0, static_cast<size_t>(bytes_sent)) << "\033[0m\n";
+  }
   if (bytes_sent == static_cast<ssize_t>(length)) { // all messages have been sent
     client.messages_outgoing_.clear();
     server_->epoll_in(client.fd_);
@@ -80,7 +80,7 @@ void MessageHandler::process_incoming_messages(Client& client) {
   }
   client.messages_incoming_.erase(0, start);
   server_->epoll_in_out(client.fd_);
-  std::cout << "\033[31m" << client.messages_outgoing_ << "\033[0m\n"; // DEBUG
+  // std::cout << "\033[31m" << client.messages_outgoing_ << "\033[0m\n"; // DEBUG
 }
 
 bool MessageHandler::client_registered(Client& client) {

@@ -13,17 +13,21 @@ static void print_usage(const char* program_name) {
 }
 
 static bool validate_port(const char* port_str, int& port) {
-  char* end;
-  long temp = std::strtol(port_str, &end, 10);
-  if (temp > INT_MAX || temp < INT_MIN) {
-    std::cerr << "Error: Port number out of range\n";
+  if (!port_str && !*port_str) {
+    std::cerr << "Error: Port cannot be empty\n";
     return false;
   }
-  port = static_cast<int>(temp);
-  if (*end != '\0' || port <= 1024 || port > 65535) {
-    std::cerr << "Error: Port must be a number between 1024 and 65535\n";
+  long tmp;
+  std::stringstream ss(port_str);
+  if (!(ss >> tmp) || !ss.eof() || ss.fail()) {
+    std::cerr << "Error: Invalid port number or number too large\n";
     return false;
   }
+  if (tmp <= 1024 || tmp > 65535) {
+    std::cerr << "Error: Port must be between 1024 and 65535\n";
+    return false;
+  }
+  port = static_cast<int>(tmp);
   return true;
 }
 
@@ -45,7 +49,6 @@ int main(int argc, char* argv[]) {
     print_usage(argv[0]);
     return EXIT_FAILURE;
   }
-
   int port;
   if (!validate_port(argv[1], port)) {
     return EXIT_FAILURE;
@@ -59,6 +62,5 @@ int main(int argc, char* argv[]) {
   else {
     IrcServ::getInstance(port).start();
   }
-
   return EXIT_SUCCESS;
 }
