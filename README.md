@@ -29,6 +29,7 @@
     - [Differences and Relationship](#differences-and-relationship)
     - [epoll](#epoll)
       - [Key Aspects of `epoll`](#key-aspects-of-epoll)
+    - [Ports](#ports)
 
 ## Project Instructions
 
@@ -57,7 +58,7 @@ Develop an IRC server in c++ 98 using non-blocking IO operations.
 ## Starting the Server
 
 This server uses **epoll** because it offers better performance than **select** and **poll**.  
-However, since **epoll** is a Linux system call, this server runs only on Linux.
+However, since **epoll** is implemented through Linux system calls, this server runs only on Linux.
 
 - **Download**: `git clone git@github.com:tgroeppmaier/ft_irc.git`
 - **Build**: `make`
@@ -115,12 +116,14 @@ The server can be tested with `nc <hostname / ip> <port>`. The server handles pa
 ### Design choices
 
 This server uses the more modern RFC 2812 IRC implementation.  
-Because of the requirement to check the sockets readiness before every send and receive, all the message to a client will be sent at once in one long cstring. This is possible because IRC messages all end with `\r\n`. For the receiving a large buffer of 4096 bytes is used to read many or most likely all messages that come from one client
+Because of the requirement to check the sockets readiness before every send and receive, all the message to a client will be sent at once in one long cstring. This is possible because IRC messages all end with `\r\n`. For the receiving a large buffer of 4096 bytes is used to read many or most likely all messages that come from one client.
+
+The server operates entirely in non-blocking mode, which means socket operations (`accept()`, `send()`, `recv()`) return immediately rather than waiting for completion. This is crucial for the event-driven architecture using `epoll`, as it prevents the server from getting stuck on individual socket operations. Combined with `epoll`, this enables efficient handling of multiple clients without the need for threading, as the server can quickly check the status of all connections and process only those that are ready for I/O operations.
 
 ### High level overview
 
-Server and client application are different processes running on some machine. For security reasons has each proccess its own memory space and cannot directly interact with another process. But to have a functional server, it needs to be able to exchange data with the client.  
-To overcome the isolation a process needs to request a form of **IPC** inter process communication from the operating system through **system calls**.  
+Server and client application are different processes running on the same or different machine. For security reasons has each proccess its own memory space and cannot directly interact with another process. But to have a functional server, the server needs to be able to exchange data with the client.
+To overcome the isolation, a process needs to request a form of **IPC** inter process communication from the operating system through **system calls**.
 There are different forms of **IPC** of which depending on the context one form might be better suited than another. One that most shell users are already familiar with is the **pipe** which allows chaining output of one process into the input for the next process. A **pipe** though can only be used by related processes (**fork**) running on the same machine. Since a the IRC server usually is not running on the same machine as the clients, a **Socket** and more specifically a **Internet Domain Socket** is the natural choice.
 
 ### Stream Sockets
@@ -385,6 +388,26 @@ In network programming, `sockaddr` and `sockaddr_in` are two structures used to 
 - **Integration with other APIs:** `epoll` can be used to monitor file descriptors created by other APIs, such as `signalfd()`, which provides a way to monitor signals using file descriptors, and `timerfd()`, which provides a way to monitor timers using file descriptors. It can also be used with eventfd objects and inotify file descriptors.
 
 In summary, `epoll` is a powerful API for I/O event notification on Linux, providing significant performance and scalability improvements compared to `select()` and `poll()`. It's most useful for high-performance and high-concurrency applications.
+
+### Ports
+
+In networking, a port is a virtual point where network connections start and end. Ports are software-based and managed by a computer's operating system. They are numbered from 0 to 65535, with specific ranges serving different purposes:
+
+- **Well-known ports (0-1023)**
+  - Reserved for common protocols and system services
+  - Examples: HTTP (80), HTTPS (443), FTP (21), SSH (22)
+  - Require root/admin privileges to use
+
+- **Registered ports (1024-49151)**
+  - Used by specific services and applications
+  - Can be used without special privileges
+  - Our IRC server typically uses ports in this range (e.g., 6667)
+
+- **Dynamic/Private ports (49152-65535)**
+  - Used for temporary connections
+  - Available for any application to use
+
+When starting the IRC server, you can specify any available port number, but it's recommended to use the registered port range to avoid conflicts with system services.
 
 
 

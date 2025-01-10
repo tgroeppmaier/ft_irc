@@ -188,6 +188,10 @@ void IrcServ::register_signal_handlers() {
       perror("Error registering SIGTERM handler");
       exit(EXIT_FAILURE);
   }
+  if (sigaction(SIGQUIT, &sa, NULL) == -1) {
+      perror("Error registering SIGQUIT handler");
+      exit(EXIT_FAILURE);
+  }
 }
 
 void IrcServ::set_non_block(int sock_fd) {
