@@ -102,6 +102,8 @@ The server can be tested with `nc <hostname / ip> <port>`. The server handles pa
 - **Show raw IRC command**: `/server raw`
 - **Switch channel / Buffer**: `F5`
 - **List servers**: `/server list`
+- **Initiate dcc file transfer**: `/dcc send <nickname> path/to/file`
+- **Download Folder for dcc**: `/set xfer.file.download_path "~/Downloads"`
 
 ## Useful Links
 
