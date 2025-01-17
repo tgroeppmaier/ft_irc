@@ -59,8 +59,10 @@ void MessageHandler::process_incoming_messages(Client& client) {
       start = end + 2;
       continue;
     }
-    // std::cout << "\033[32m" << message << "\033[0m\n"; // DEBUG
     start = end + 2;
+    if (message.empty()) {
+      continue; // Ignore empty lines
+    }
     stringstream ss(message);
     string command;
     if (!(ss >> command)) {
@@ -80,7 +82,6 @@ void MessageHandler::process_incoming_messages(Client& client) {
   }
   client.messages_incoming_.erase(0, start);
   server_->epoll_in_out(client.fd_);
-  // std::cout << "\033[31m" << client.messages_outgoing_ << "\033[0m\n"; // DEBUG
 }
 
 bool MessageHandler::client_registered(Client& client) {
