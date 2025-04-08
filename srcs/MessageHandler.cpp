@@ -370,7 +370,7 @@ void MessageHandler::command_PRIVMSG(Client& sender, stringstream& message) {
       string full_message = ":" + sender.nick_ + "!" + sender.username_ + "@" +
                            sender.hostname_ + " PRIVMSG " + current_target +
                            " :" + message_content + "\r\n";
-      channel->broadcast(full_message);
+      channel->broadcast(full_message, sender.fd_);
     }
     else {
       Client* target_client = server_->get_client(current_target);

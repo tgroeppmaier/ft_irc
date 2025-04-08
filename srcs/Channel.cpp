@@ -14,11 +14,14 @@ Channel::~Channel() {
   modes_.clear();
 }
 
-void Channel::broadcast(const std::string& message) {
+void Channel::broadcast(const std::string& message, int exclude_fd) {
   std::map<int, Client*>::const_iterator it = clients_.begin();
   for (; it != clients_.end(); ++it) {
+    // Skip client if it matches the exclude_fd
+    if (it->first != exclude_fd) {
       it->second->add_message_out(message);
       server_.epoll_in_out(it->first);
+    }
   }
 }
 

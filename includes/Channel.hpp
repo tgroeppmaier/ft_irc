@@ -30,7 +30,7 @@ public:
   Channel(IrcServ& server, const std::string name, Client& client);
   ~Channel();
 
-  void broadcast(const std::string& message);
+  void broadcast(const std::string& message, int exclude_fd = -1);
   void add_client(Client& client);
   void remove_client(Client& client);
   void remove_client_invite_list(int fd);
