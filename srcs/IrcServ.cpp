@@ -133,13 +133,14 @@ void IrcServ::signal_handler(int signal) {
   exit(0);
 }
 
-void IrcServ::close_socket(int fd) {
+void IrcServ::close_socket(int& fd) {
   if (fd != -1) {
     if (close(fd) == -1) {
       perror("Error closing socket");
     } else {
       std::cout << "Socket " << fd << " closed successfully." << std::endl;
     }
+    fd = -1;  // Reset the fd value
   }
 }
 
@@ -157,6 +158,7 @@ void IrcServ::delete_client(int client_fd) {
 
 // Close and delete all client connections
 void IrcServ::cleanup() {
+  clients_to_close.clear();
   std::vector<int> client_fds;
   for (std::map<int, Client*>::iterator it = clients_.begin(); it != clients_.end(); ++it) {
     client_fds.push_back(it->first);
@@ -170,7 +172,10 @@ void IrcServ::cleanup() {
     delete it->second;
   }
   channels_.clear();
-  delete message_handler_;
+  if (message_handler_ != NULL) {
+    delete message_handler_;
+    message_handler_ = NULL;
+  }
   close_socket(server_fd_);
   close_socket(ep_fd_);
 }
@@ -194,11 +199,12 @@ void IrcServ::register_signal_handlers() {
   }
 }
 
-void IrcServ::set_non_block(int sock_fd) {
+bool IrcServ::set_non_block(int sock_fd) {
   if (fcntl(sock_fd, F_SETFL, O_NONBLOCK) == -1) {
     perror("Error. Failed to set socket to non-blocking mode");
-    exit(EXIT_FAILURE);
+    return false;
   }
+  return true;
 }
 
 void IrcServ::initializeServerAddr() {
@@ -227,14 +233,19 @@ void IrcServ::start() {
     perror("Error. Failed to create socket");
     exit(EXIT_FAILURE);
   }
-  set_non_block(server_fd_);
+  if (!set_non_block(server_fd_)) {
+    cleanup();
+    exit(EXIT_FAILURE);
+  }
   ep_fd_ = epoll_create1(0);
   if (ep_fd_ == -1) {
     perror("Error. Failed to create epoll instance");
+    cleanup();
     exit(EXIT_FAILURE);
   }
   if(!add_fd_to_epoll(server_fd_)) {
     perror("Error adding server socket to epoll");
+    cleanup();
     exit(EXIT_FAILURE);
   }
   if (bind(server_fd_, (sockaddr*)&server_addr_, sizeof(server_addr_)) == -1) {
@@ -244,6 +255,7 @@ void IrcServ::start() {
   }
   if (listen(server_fd_, 10) == -1) {
     perror("Error. Failed to listen on socket");
+    cleanup();
     exit(EXIT_FAILURE);
   }
 // Optional - Get the IP address on which the server is listening
@@ -279,10 +291,14 @@ void IrcServ::event_loop() {
             // No incoming connections, continue the loop
             continue;
           } else {
-            exit(EXIT_FAILURE);
+            std::cerr << "Failed to accept client connection: " << strerror(errno) << std::endl;
+            continue;
           }
         }
-        set_non_block(client_fd);
+        if (!set_non_block(client_fd)) {
+          close(client_fd);
+          continue;
+        }
         char* client_ip = inet_ntoa(client_addr.sin_addr);
         std::string client_hostname(client_ip);
         if (!add_fd_to_epoll(client_fd)) {

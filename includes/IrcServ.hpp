@@ -36,7 +36,7 @@ private:
   IrcServ& operator=(const IrcServ&);  // Prevent assignment
 
   static void signal_handler(int signal);
-  void set_non_block(int sock_fd);
+  bool set_non_block(int sock_fd);
   void cleanup_clients();
   void initializeServerAddr();
   bool add_fd_to_epoll(int fd);
@@ -51,7 +51,7 @@ public:
   ~IrcServ();
   void start();
   void cleanup();
-  void close_socket(int fd);
+  void close_socket(int& fd);
   std::string to_upper(const std::string& str);
   void delete_client(int fd);
   void add_to_close(Client* client);

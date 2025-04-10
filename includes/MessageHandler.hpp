@@ -59,7 +59,7 @@ class Client;
 
 class MessageHandler {
 private:
-  // Prevent copying by declaring private (C++98 style)
+  // Prevent copying by declaring private
   MessageHandler(const MessageHandler&);
   MessageHandler& operator=(const MessageHandler&);
 
