@@ -272,9 +272,9 @@ void IrcServ::start() {
 }
 
 void IrcServ::event_loop() {
+  epoll_event events[100];
   while (true) {
     int client_fd = -1;
-    epoll_event events[100];
     int n = epoll_wait(ep_fd_, events, 100, -1);
     if (n == -1) {
       perror("epoll_wait");
